@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "428210364000",
+    "project_id": "mygdrive2-44fd4",
+    "storage_bucket": "mygdrive2-44fd4.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:428210364000:android:e95867d82f90a6d745ad05",
+        "android_client_info": {
+          "package_name": "com.squorpikkor.mygdrive2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "428210364000-893chblo6legd8iip6v8ipuk1mnt7g2f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgEWm0910mgdt6a910eLzTm2LAYLiegIU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "428210364000-893chblo6legd8iip6v8ipuk1mnt7g2f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

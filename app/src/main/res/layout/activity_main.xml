@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    >
+
+    <ImageView
+        android:layout_gravity="center"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:src="@drawable/ic_baseline_wb_cloudy_24"/>
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/create_folder"
+        android:text="Create Folder"/>
+
+    <Button
+        android:id="@+id/open_btn"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:text="Open"/>
+
+    <Button
+        android:id="@+id/create_btn"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:text="Create"/>
+
+    <Button
+        android:id="@+id/save_btn"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:text="Save"/>
+
+    <Button
+        android:id="@+id/query_btn"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:text="Query"/>
+
+    <Button
+        android:id="@+id/upload_btn"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:text="Upload"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+
+        <EditText
+            android:id="@+id/file_title_edittext"
+            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="1"/>
+
+        <ScrollView
+            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            >
+
+
+        <EditText
+            android:id="@+id/doc_content_edittext"
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            />
+
+        </ScrollView>
+
+
+    </LinearLayout>
+
+</LinearLayout>

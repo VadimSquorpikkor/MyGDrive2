@@ -12,7 +12,16 @@
         android:layout_height="96dp"
         android:src="@drawable/ic_baseline_wb_cloudy_24"/>
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="10dp"
+        android:text="Не выбран аккаунт"
+        android:id="@+id/account"/>
+
     <Button
+        android:layout_marginTop="20dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/create_folder"

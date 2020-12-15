@@ -5,6 +5,15 @@
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
     <uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <uses-permission android:name="android.permission.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
 
     <application
         android:allowBackup="true"
@@ -21,12 +30,8 @@
             </intent-filter>
         </activity>
 
-        <meta-data android:value="AIzaSyABrX6WwM2WQC2djvG6auBwgTQqZzL5_kw" android:name="api_key"/>
+        <!--<meta-data android:value="AIzaSyABrX6WwM2WQC2djvG6auBwgTQqZzL5_kw" android:name="api_key"/>-->
 
-
-        <!--        <meta-data-->
-<!--            android:name="com.google.android.geo.API_KEY"-->
-<!--            android:value="AIzaSyABrX6WwM2WQC2djvG6auBwgTQqZzL5_kw"/>-->
     </application>
 
 </manifest>

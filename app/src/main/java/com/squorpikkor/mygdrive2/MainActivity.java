@@ -1,16 +1,19 @@
 package com.squorpikkor.mygdrive2;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.widget.EditText;
-import android.widget.Toast;
-
+import android.widget.TextView;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
@@ -23,12 +26,12 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.gson.Gson;
 
 import java.util.Collections;
+
+import static android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -39,6 +42,10 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_SIGN_IN = 1;
     private static final int REQUEST_CODE_OPEN_DOCUMENT = 2;
     private static final int REQUEST_CODE_OPEN_DOCUMENT_TO_UPLOAD = 3;
+
+    private static final int MANAGE_ALL_FILES_ACCESS_PERMISSION = 4;
+    private static final int PERMISSION_WRITE_MEMORY = 5;
+    private static final int PERMISSION_FINE_LOCATION = 6;
 
     public static final String EMAIL = "nautizxatomtex@gmail.com";
     public static final String PASSWORD = "nautiz-x6";
@@ -56,7 +63,35 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         // Check if user is signed in (non-null) and update UI accordingly.
         FirebaseUser currentUser = mAuth.getCurrentUser();
-        //todo//updateUI(currentUser);
+        ////updateUI(currentUser);
+    }
+
+    void updateUI(String email) {
+        ((TextView)findViewById(R.id.account)).setText(email);
+    }
+
+    private void requestPermissions() {
+        Log.e(TAG, "♠♠♠♠♠requestPermissions♠♠♠♠♠");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Environment.isExternalStorageManager()) {
+                Log.e(TAG, "..........Разрешение ALL_FILES_ACCESS включено, идем дальше");
+            } else {
+                Log.e(TAG, "..........Разрешение ALL_FILES_ACCESS выключено, значит идем в настройки и включаем");
+                Intent intent = new Intent(ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                startActivityForResult(intent, MANAGE_ALL_FILES_ACCESS_PERMISSION);
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            switch (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                case PackageManager.PERMISSION_DENIED:
+                    requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                            PERMISSION_WRITE_MEMORY);
+                    break;
+                case PackageManager.PERMISSION_GRANTED:
+                    break;
+            }
+
+        }
     }
 
     @Override
@@ -64,7 +99,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mAuth = FirebaseAuth.getInstance();
+        if (savedInstanceState == null) {
+            requestPermissions();
+        }
+
+        mAuth = FirebaseAuth.getInstance();//todo а это вообще нужно???
 
         // Store the EditText boxes to be updated when files are opened/created/modified.
         mFileTitleEditText = findViewById(R.id.file_title_edittext);
@@ -77,10 +116,26 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.save_btn).setOnClickListener(view -> saveFile());
         findViewById(R.id.query_btn).setOnClickListener(view -> query());
         findViewById(R.id.upload_btn).setOnClickListener(view -> openFilePickerToUpload());
+        findViewById(R.id.account).setOnClickListener(view -> selectAccount());
 
         // Authenticate the user. For most apps, this should be done when the user performs an
         // action that requires Drive access rather than in onCreate.
         requestSignIn();
+    }
+
+    void selectAccount() {
+        GoogleSignInOptions signInOptions =
+                new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestEmail()
+                        .requestScopes(new Scope(DriveScopes.DRIVE_FILE))
+                        .build();
+        GoogleSignInClient client = GoogleSignIn.getClient(this, signInOptions);
+
+        client.signOut();
+
+        // The result of the sign-in Intent is handled in onActivityResult.
+        startActivityForResult(client.getSignInIntent(), REQUEST_CODE_SIGN_IN);
+
     }
 
     @Override
@@ -106,12 +161,20 @@ public class MainActivity extends AppCompatActivity {
                 if (resultCode == Activity.RESULT_OK && resultData != null) {
                     Uri uri = resultData.getData();
                     if (uri != null) {
-                        uploadFile(new java.io.File(uri.getPath()));
+                        uploadFile(new java.io.File(Environment.getExternalStorageDirectory(), "nuclib.txt"));
+//                        uploadFile(new java.io.File(uri.getPath()));
                     }
                 }
                 break;
+            case MANAGE_ALL_FILES_ACCESS_PERMISSION: //при открытии настройки включения разрешения чтения/записи, это реакция на то, включил пользователь доступ или нет
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    if (Environment.isExternalStorageManager()) {
+                        Log.e(TAG, "..........разрешение включено, запускаем приложение");
+                    } else {
+                        Log.e(TAG, "..........разрешение НЕ ВКЛЮЧЕНО, приложение будет выключено");
+                    }
+                }
         }
-
         super.onActivityResult(requestCode, resultCode, resultData);
     }
 
@@ -128,6 +191,9 @@ public class MainActivity extends AppCompatActivity {
                         .build();
         GoogleSignInClient client = GoogleSignIn.getClient(this, signInOptions);
 
+        Log.e(TAG, "requestSignIn: client = " + client);
+
+
         // The result of the sign-in Intent is handled in onActivityResult.
         startActivityForResult(client.getSignInIntent(), REQUEST_CODE_SIGN_IN);
     }
@@ -139,7 +205,8 @@ public class MainActivity extends AppCompatActivity {
     private void handleSignInResult(Intent result) {
         GoogleSignIn.getSignedInAccountFromIntent(result)
                 .addOnSuccessListener(googleAccount -> {
-                    Log.d(TAG, "Signed in as " + googleAccount.getEmail());
+                    Log.e(TAG, "Signed in as " + googleAccount.getEmail());
+                    updateUI(googleAccount.getEmail());
 
                     // Use the authenticated account to sign in to the Drive service.
                     GoogleAccountCredential credential =
@@ -226,7 +293,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void uploadFile(java.io.File localFile) {
+        Log.e(TAG, "upload: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Uploading a file.");
 
+            mDriveServiceHelper.uploadFile(localFile, "text/plain", null)
+                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
+                    .addOnFailureListener(exception ->
+                            Log.e(TAG, "Couldn't create file.", exception));
+        }
     }
 
     /**
@@ -285,8 +360,8 @@ public class MainActivity extends AppCompatActivity {
 //                            builder.append(file.getKind()).append("\n");
 //                            builder.append(file.getFileExtension()).append("\n");
                             builder.append(file.getMimeType()).append("\n");
-                            builder.append(file.getSize()).append("\n");
-                            builder.append(file.getId()).append("\n");
+//                            builder.append(file.getSize()).append("\n");
+//                            builder.append(file.getId()).append("\n");
                             builder.append(file.getName()).append("\n");
                         }
                         String fileNames = builder.toString();

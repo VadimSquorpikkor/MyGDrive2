@@ -77,6 +77,23 @@ public class DriveServiceHelper {
         });
     }
 
+    //альтернативная версия
+    public Task<String> uploadFile(final java.io.File localFile, String type) {
+        return Tasks.call(mExecutor, () -> {
+            // Retrieve the metadata as a File object.
+            File fileMetadata = new File();
+            fileMetadata.setName(localFile.getName());
+            java.io.File filePath = new java.io.File(localFile.getAbsolutePath());
+            FileContent mediaContent = new FileContent(type, filePath);
+            File file = mDriveService.files().create(fileMetadata, mediaContent)
+                    .setFields("id")
+                    .execute();
+            System.out.println("File ID: " + file.getId());
+
+            return file.getId();
+        });
+    }
+
     // TO UPLOAD A FILE ONTO DRIVE
     public Task<String> uploadFile(final java.io.File localFile,
                                  final String mimeType, @Nullable final String folderId) {

@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.FileObserver;
 import android.util.Log;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -50,6 +51,10 @@ public class MainActivity extends AppCompatActivity {
     public static final String EMAIL = "nautizxatomtex@gmail.com";
     public static final String PASSWORD = "nautiz-x6";
 
+    public static final String MIME_TEXT_FILE = "text/plain";
+    public static final String MIME_IMAGE_JPEG ="image/jpeg";
+    public static final String MIME_FOLDER = "application/vnd.google-apps.folder";
+
     private DriveServiceHelper mDriveServiceHelper;
     private String mOpenFileId;
 
@@ -57,6 +62,12 @@ public class MainActivity extends AppCompatActivity {
     private EditText mDocContentEditText;
 
     private FirebaseAuth mAuth;
+
+    private FileObserver mFileObserver;
+
+    public static final String DIRECTORY = "Android/data/com.atomtex.ascanner";
+    //public static final String APP_DIR = Environment.getExternalStorageDirectory() + DIRECTORY;
+    java.io.File sMainDir;
 
     @Override
     public void onStart() {
@@ -102,6 +113,10 @@ public class MainActivity extends AppCompatActivity {
         if (savedInstanceState == null) {
             requestPermissions();
         }
+
+        sMainDir = new java.io.File(Environment.getExternalStorageDirectory(), DIRECTORY);
+        mFileObserver = createFileObserver(sMainDir.getAbsolutePath());
+        mFileObserver.startWatching();
 
         mAuth = FirebaseAuth.getInstance();//todo а это вообще нужно???
 
@@ -297,10 +312,35 @@ public class MainActivity extends AppCompatActivity {
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Uploading a file.");
 
-            mDriveServiceHelper.uploadFile(localFile, "text/plain", null)
+            mDriveServiceHelper.uploadFile(localFile, MIME_TEXT_FILE, null)
                     .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
                     .addOnFailureListener(exception ->
                             Log.e(TAG, "Couldn't create file.", exception));
+        }
+    }
+
+    //альтернативная версия
+    private void uploadFile(java.io.File localFile, String type) {
+        Log.e(TAG, "upload: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Uploading a file.");
+
+            mDriveServiceHelper.uploadFile(localFile, type)
+                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
+                    .addOnFailureListener(exception ->
+                            Log.e(TAG, "Couldn't create file.", exception));
+        }
+    }
+
+    private void uploadFolder(java.io.File localFile) {
+        Log.e(TAG, "upload: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Uploading a folder.");
+
+            mDriveServiceHelper.uploadFile(localFile, MIME_FOLDER, null)
+                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
+                    .addOnFailureListener(exception ->
+                            Log.e(TAG, "Couldn't create folder.", exception));
         }
     }
 
@@ -404,6 +444,36 @@ public class MainActivity extends AppCompatActivity {
         mFileTitleEditText.setEnabled(true);
         mDocContentEditText.setEnabled(true);
         mOpenFileId = fileId;
+    }
+
+    /**
+     * Sets up a FileObserver to watch the current directory.
+     */
+    private FileObserver createFileObserver(final String dirPath) {
+        Log.e(TAG, "♦♦♦createFileObserver: START");
+        return new FileObserver(dirPath, FileObserver.CREATE | FileObserver.DELETE
+                | FileObserver.MOVED_FROM | FileObserver.MOVED_TO) {
+
+            @Override
+            public void onEvent(final int event, final String path) {
+                Log.e(TAG, "♦♦♦onEvent: " + event);
+
+                java.io.File file = new java.io.File(dirPath, path);
+                Log.e(TAG, "onEvent: Path = " + dirPath);
+                if (file.isDirectory()){
+                    Log.e(TAG, "" + file.getAbsolutePath() + " IS DIRECTORY");
+//                    uploadFolder(new java.io.File(dirPath, path));
+                    uploadFile(file, MIME_FOLDER);
+                }
+                else{
+                    Log.e(TAG, "" + file.getAbsolutePath() + " IS FILE");
+                    uploadFile(file, MIME_TEXT_FILE);
+                }
+
+
+
+            }
+        };
     }
 
 }

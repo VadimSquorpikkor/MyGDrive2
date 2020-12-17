@@ -15,6 +15,7 @@ import android.os.FileObserver;
 import android.util.Log;
 import android.widget.EditText;
 import android.widget.TextView;
+
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
@@ -30,15 +31,30 @@ import com.google.api.services.drive.model.File;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
+import java.util.ArrayList;
 import java.util.Collections;
 
 import static android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION;
 
 public class MainActivity extends AppCompatActivity {
 
+    // пока "root", в последствии id будет равен id папки "Radiation Scanner Assistant", т.е.
+    // все данные будут храниться не в корне gDrive, а в своей папке, так будет порядок, ведь у
+    // пользователя на облаке может храниться не только RSA файлы
+    //
+    // Важно: id нужно будет не хранить в программе, а при подключении к облаку получать список
+    // файлов, искать в нем папку RSA, и брать у неё id
+    // ведь если программа будет удалена/переустановлена/установлена на новый телефон, нужно, чтобы
+    // данные продолжали храниться в папке RSA, а не создавать ещё одну папку с таким же именем
+    //
+    // ! если пользователь создаст на облаке руками папку RSA, переместит в неё файлы из
+    // оригинальной папки, а оригинальную папку затем удалит, то программа эту новую папку не увидит
+    // (так как была создана не программой) и создаст новую папку
+    private static final String ROOT_FOLDER_ID = "root";
+
     final String API_KEI = "AIzaSyABrX6WwM2WQC2djvG6auBwgTQqZzL5_kw";
 
-    private static final String TAG = "..........";
+    public static final String TAG = "..........";
 
     private static final int REQUEST_CODE_SIGN_IN = 1;
     private static final int REQUEST_CODE_OPEN_DOCUMENT = 2;
@@ -52,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String PASSWORD = "nautiz-x6";
 
     public static final String MIME_TEXT_FILE = "text/plain";
-    public static final String MIME_IMAGE_JPEG ="image/jpeg";
+    public static final String MIME_IMAGE_JPEG = "image/jpeg";
     public static final String MIME_FOLDER = "application/vnd.google-apps.folder";
 
     private DriveServiceHelper mDriveServiceHelper;
@@ -78,7 +94,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void updateUI(String email) {
-        ((TextView)findViewById(R.id.account)).setText(email);
+        ((TextView) findViewById(R.id.account)).setText(email);
     }
 
     private void requestPermissions() {
@@ -125,12 +141,15 @@ public class MainActivity extends AppCompatActivity {
         mDocContentEditText = findViewById(R.id.doc_content_edittext);
 
         // Set the onClick listeners for the button bar.
-        findViewById(R.id.create_folder).setOnClickListener(view -> createFolder());
+        findViewById(R.id.create_folder).setOnClickListener(view -> createFolder("NewFolder", null));
         findViewById(R.id.open_btn).setOnClickListener(view -> openFilePicker());
         findViewById(R.id.create_btn).setOnClickListener(view -> createFile());
         findViewById(R.id.save_btn).setOnClickListener(view -> saveFile());
         findViewById(R.id.query_btn).setOnClickListener(view -> query());
-        findViewById(R.id.upload_btn).setOnClickListener(view -> openFilePickerToUpload());
+//        findViewById(R.id.upload_btn).setOnClickListener(view -> openFilePickerToUpload());
+//        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolder(new java.io.File(sMainDir, "20201208_152907"), null));
+//        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir, "20201208_152907"), null));
+        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir.toString()), null));
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
 
         // Authenticate the user. For most apps, this should be done when the user performs an
@@ -332,16 +351,54 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void uploadFolder(java.io.File localFile) {
+    //альтернативная версия 2
+    private void uploadFile(java.io.File localFile, String type, String id) {
         Log.e(TAG, "upload: TRY");
         if (mDriveServiceHelper != null) {
-            Log.e(TAG, "Uploading a folder.");
+            Log.e(TAG, "Uploading a file.");
 
-            mDriveServiceHelper.uploadFile(localFile, MIME_FOLDER, null)
+            mDriveServiceHelper.uploadFile(localFile, MIME_TEXT_FILE, id)
                     .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
                     .addOnFailureListener(exception ->
-                            Log.e(TAG, "Couldn't create folder.", exception));
+                            Log.e(TAG, "Couldn't create file.", exception));
         }
+    }
+
+    //squorpikkor Не корректно работает, скидывает все файлы в корень, игнорируя папки
+    //косяк в том, что папки создаутся в отдельном треде, а файлы начинают аплодиться в главном треде не дожидаясь пока метод загрузки вернет id созданной папки
+    private void uploadFolder(java.io.File folder, String mainId) { //
+        Log.e(TAG, "upload: TRY");
+        String name = folder.getName();
+        Log.e(TAG, "uploadFolder: FOLDER NAME = " + name);
+        Log.e(TAG, "uploadFolder: FOLDER PATH = " + folder.getAbsolutePath());
+        String id = createFolder(name, mainId);//создать папку с именем и ID папки родителя. Получить id новой папки
+
+        Log.e(TAG, "uploadFolder: FOLDER ID = " + id);
+        java.io.File[] files = folder.listFiles(); //получить список файлов в папке, которую надо скопировать
+        Log.e(TAG, "uploadFolder: files.size = " + files.length);
+//        Log.e(TAG, "uploadFolder:  files.size = " + new java.io.File(Environment.getExternalStorageDirectory().getAbsolutePath()).listFiles().length);
+        for (java.io.File file:files) {
+            file.getName();
+            Log.e(TAG, "........... id = " + id);
+            if (!file.isDirectory()) uploadFile(file, MIME_TEXT_FILE, id); //если это файл, аплодить его в папку с id новой папки
+            else uploadFolder(file, id);//если это директория, то рекурсивно вызывается весь метод uploadFolder
+        }
+    }
+
+    // squorpikkor
+    // Метод работает в связке с createFolderNew
+    // Загружается папка вместе с подпапками и файлами в ней
+    // Вся загрузка идет в отдельном треде: если среди загружаемых файлов попадается папка,
+    // то создается папка с именем загружаемой папки, создание папки происходит в отдельном треде
+    // при успешном создании в эту папку закидываются файлы из списка файлов папки
+    // Т.е. каждая папка открывает свой собственный тред для загрузки
+    // подпапки загружаются рекурсивно
+    private void uploadFolderNew(java.io.File folder, String mainId) { //
+        Log.e(TAG, "upload: TRY");
+        String name = folder.getName();
+        Log.e(TAG, "uploadFolder: FOLDER NAME = " + name);
+        Log.e(TAG, "uploadFolder: FOLDER PATH = " + folder.getAbsolutePath());
+        createFolderNew(folder, mainId);//создать папку с именем и ID папки родителя. Получить id новой папки
     }
 
     /**
@@ -415,17 +472,72 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void createFolder() {
+    // squorpikkor
+    // Метод работает в связке с uploadFolderNew
+    // Загружается папка вместе с подпапками и файлами в ней
+    // Вся загрузка идет в отдельном треде: если среди загружаемых файлов попадается папка,
+    // то создается папка с именем загружаемой папки, создание папки происходит в отдельном треде
+    // при успешном создании в эту папку закидываются файлы из списка файлов папки
+    // Т.е. каждая папка открывает свой собственный тред для загрузки
+    // подпапки загружаются рекурсивно
+    private void createFolderNew(java.io.File folder, String folderId) {
         Log.e(TAG, "createFolder: TRY");
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Creating a folder.");
 
-            mDriveServiceHelper.createFolder("NewFolder")
-                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
-                    .addOnFailureListener(exception ->
-                            Log.e(TAG, "Couldn't create folder.", exception));
+            mDriveServiceHelper.createFolder(folder.getName(), folderId)
+                    .addOnSuccessListener(fileId -> {
+                        Log.e(TAG, "createFolder ID = : " + fileId);
+
+                        for (java.io.File file:folder.listFiles()) {
+                            file.getName();
+                            Log.e(TAG, "........... id = " + fileId);
+                            if (!file.isDirectory()) uploadFile(file, MIME_TEXT_FILE, fileId); //если это файл, аплодить его в папку с id новой папки
+                            else uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
+                        }
+
+                    })
+                    .addOnFailureListener(exception ->{
+                        Log.e(TAG, "Couldn't create folder.", exception);
+                    });
         }
 
+    }
+
+    private String createFolder(String name, String folderId) {
+        final String[] id = new String[1];
+        Log.e(TAG, "createFolder: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Creating a folder.");
+
+            mDriveServiceHelper.createFolder(name, folderId)
+                    .addOnSuccessListener(fileId -> {
+                        Log.e(TAG, "createFolder ID = : " + fileId);
+                        id[0] = fileId;
+                        /*readFile(fileId)*/
+                    })
+                    .addOnFailureListener(exception ->{
+                        Log.e(TAG, "Couldn't create folder.", exception);
+//                        id[0] = "0";
+                        });
+        }
+
+//        if (!id[0].equals("0") && id[0]!=null)return id[0];
+//        else if (id[0].equals("0"))return null;
+
+
+        /*while (id[0]==null) {
+            Log.e(TAG, ".........try get id.......");
+            synchronized (this) {
+                try {
+                    wait(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        if (id.equals("0"))return null;
+        else */return id[0];
     }
 
     /**
@@ -455,23 +567,20 @@ public class MainActivity extends AppCompatActivity {
                 | FileObserver.MOVED_FROM | FileObserver.MOVED_TO) {
 
             @Override
-            public void onEvent(final int event, final String path) {
+            public void onEvent(final int event, final String name) {
                 Log.e(TAG, "♦♦♦onEvent: " + event);
 
-                java.io.File file = new java.io.File(dirPath, path);
+                java.io.File file = new java.io.File(dirPath, name);
                 Log.e(TAG, "onEvent: Path = " + dirPath);
-                if (file.isDirectory()){
+                if (file.isDirectory()) {
                     Log.e(TAG, "" + file.getAbsolutePath() + " IS DIRECTORY");
-//                    uploadFolder(new java.io.File(dirPath, path));
-                    uploadFile(file, MIME_FOLDER);
-                }
-                else{
+//                    uploadFolder(file, ROOT_FOLDER_ID);
+                    uploadFolder(new java.io.File(dirPath + "/" + name + "/"), ROOT_FOLDER_ID);
+//                    uploadFile(file, MIME_FOLDER);
+                } else {
                     Log.e(TAG, "" + file.getAbsolutePath() + " IS FILE");
                     uploadFile(file, MIME_TEXT_FILE);
                 }
-
-
-
             }
         };
     }

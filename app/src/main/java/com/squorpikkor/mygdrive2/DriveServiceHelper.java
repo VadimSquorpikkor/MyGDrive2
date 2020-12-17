@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
+import android.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.Nullable;
@@ -26,6 +27,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import static com.squorpikkor.mygdrive2.MainActivity.TAG;
+
 /**
  * A utility for performing read/write operations on Drive files via the REST API and opening a
  * file picker UI via Storage Access Framework.
@@ -42,10 +45,13 @@ public class DriveServiceHelper {
      * Добавлено
      * Creates folder in the user's My Drive folder and returns its file ID.
      */
-    public Task<String> createFolder(String name) {
+    public Task<String> createFolder(String name, String id) {
+        String fileId;
+        if (id == null) fileId = "root";
+        else fileId = id;
         return Tasks.call(mExecutor, () -> {
             File metadata = new File()
-                    .setParents(Collections.singletonList("root"))
+                    .setParents(Collections.singletonList(fileId))
                     .setMimeType("application/vnd.google-apps.folder")
                     .setName(name);
 
@@ -97,6 +103,7 @@ public class DriveServiceHelper {
     // TO UPLOAD A FILE ONTO DRIVE
     public Task<String> uploadFile(final java.io.File localFile,
                                  final String mimeType, @Nullable final String folderId) {
+        Log.e(TAG, "uploadFile: " + folderId);
         return Tasks.call(mExecutor, () -> {
             // Retrieve the metadata as a File object.
             List<String> root;

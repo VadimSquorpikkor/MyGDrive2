@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.util.Log;
 import android.util.Pair;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
@@ -49,6 +50,17 @@ public class DriveServiceHelper {
         String fileId;
         if (id == null) fileId = "root";
         else fileId = id;
+
+//        Tasks tasks;
+
+        /*checkIfExist(name).addOnSuccessListener(fileList -> {
+            if (fileList != null && fileList.getFiles() != null && fileList.getFiles().size() != 0) {
+                Log.e(TAG, ".....FILE NOT EXISTS!!!");
+            } else Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+
+        });*/
+
+
         return Tasks.call(mExecutor, () -> {
             File metadata = new File()
                     .setParents(Collections.singletonList(fileId))
@@ -62,7 +74,32 @@ public class DriveServiceHelper {
 
             return googleFile.getId();
         });
+
+
     }
+
+    /*public Task<String> createFolderIfNotExists(String name, String id) {
+        checkIfExist(name).addOnSuccessListener(fileList -> {
+            if (fileList != null && fileList.getFiles() != null && fileList.getFiles().size() != 0) {
+                Log.e(TAG, ".....FILE NOT EXISTS!!!");
+            } else Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+
+        });
+
+        return Tasks.call(mExecutor, () -> {
+            File metadata = new File()
+                    .setParents(Collections.singletonList(fileId))
+                    .setMimeType("application/vnd.google-apps.folder")
+                    .setName(name);
+
+            File googleFile = mDriveService.files().create(metadata).execute();
+            if (googleFile == null) {
+                throw new IOException("Null result when requesting file creation.");
+            }
+
+            return googleFile.getId();
+        });
+    }*/
 
     /**
      * Creates a text file in the user's My Drive folder and returns its file ID.
@@ -182,7 +219,21 @@ public class DriveServiceHelper {
      * Developer's Console</a> and be submitted to Google for verification.</p>
      */
     public Task<FileList> queryFiles() {
-        return Tasks.call(mExecutor, () -> mDriveService.files().list().setSpaces("drive").execute());
+//        return Tasks.call(mExecutor, () -> mDriveService.files().list().setSpaces("drive").execute());//так было
+
+        /*Files.List request=service().files().list().setQ(
+                "mimeType='application/vnd.google-apps.folder' and trashed=false and name='"+folderName+"'");
+        FileList files = request.execute();*/
+
+//        todo "mimeType='application/vnd.google-apps.folder' and trashed=false");
+
+        return Tasks.call(mExecutor, () -> mDriveService.files().list().setFields("files(id, name, parents, mimeType, trashed)").execute()); //я изменил, теперь можно получать инфу: id, имя, id родителя, mime тип, удален ли файл
+    }
+
+    public Task<FileList> checkIfExist(String name/*, String parentId*/) {
+        Log.e(TAG, "checkIfExist");
+//        return Tasks.call(mExecutor, () -> mDriveService.files().list().setFields("files(id, name, parents, mimeType) and trashed=false and name='"+name+"'").execute());
+        return Tasks.call(mExecutor, () -> mDriveService.files().list().setQ("trashed=false and name='"+name+"'").execute());
     }
 
     /**
@@ -229,6 +280,69 @@ public class DriveServiceHelper {
             return Pair.create(name, content);
         });
     }
+
+//--------------------------------------------------------------------------------------------------
+
+    public void createFolderInDrive() {
+        boolean existed = checkExistedFolder("MyFolder");
+
+        if (!existed) {
+            File fileMetadata = new File();
+            fileMetadata.setName("MyFolder");
+            fileMetadata.setMimeType("application/vnd.google-apps.folder");
+
+            File file = null;
+            try {
+                file = mDriveService.files().create(fileMetadata)
+                        .setFields("id")
+                        .execute();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.out.println("Folder ID: " + file.getId());
+
+            Log.e(this.toString(), "Folder Created with ID:" + file.getId());
+
+
+
+//            Toast.LENGTH_SHORT).show();
+        } else {
+            Log.e(TAG, "Folder is existed already");
+        }
+
+
+    }
+
+    private boolean checkExistedFolder(String folderName) {
+        //File file = null;
+        boolean existedFolder = true;
+        // check if the folder exists already
+        try {
+            //String query = "mimeType='application/vnd.google-apps.folder' and trashed=false and title='" + "Evacuation Kit" + "'";
+            String query = "mimeType='application/vnd.google-apps.folder' and trashed=false and name='" + folderName + "'";
+            // add parent param to the query if needed
+            //if (parentId != null) {
+            //query = query + " and '" + parentId + "' in parents";
+            // }
+
+            Drive.Files.List request = mDriveService.files().list().setQ(query);
+            FileList fileList = request.execute();
+
+            if (fileList.getFiles().size() == 0) {
+                // file = fileList.getFiles().get(0);
+                existedFolder = false;
+
+            }
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+
+        }
+        return existedFolder;
+    }
+
+
 
 
 }

@@ -1,90 +1,129 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    >
+    android:orientation="vertical">
 
     <ImageView
+        android:layout_width="72dp"
+        android:layout_height="72dp"
         android:layout_gravity="center"
-        android:layout_width="96dp"
-        android:layout_height="96dp"
-        android:src="@drawable/ic_baseline_wb_cloudy_24"/>
+        android:src="@drawable/ic_baseline_wb_cloudy_24" />
 
     <TextView
+        android:id="@+id/account"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_margin="5dp"
+        android:background="#dd5533"
         android:gravity="center"
-        android:padding="10dp"
-        android:text="Не выбран аккаунт"
-        android:id="@+id/account"/>
+        android:padding="6dp"
+        android:text="Не выбран аккаунт" />
 
-    <Button
-        android:layout_marginTop="20dp"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/create_folder"
-        android:text="Create Folder"/>
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-    <Button
-        android:id="@+id/open_btn"
-        android:layout_height="wrap_content"
-        android:layout_width="match_parent"
-        android:text="Open"/>
+        <Button
+            android:id="@+id/get_folder_id"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Get Folder id" />
 
-    <Button
-        android:id="@+id/create_btn"
-        android:layout_height="wrap_content"
-        android:layout_width="match_parent"
-        android:text="Create"/>
+        <Button
+            android:id="@+id/create_folder_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Create Folder 2" />
 
-    <Button
-        android:id="@+id/save_btn"
-        android:layout_height="wrap_content"
-        android:layout_width="match_parent"
-        android:text="Save"/>
+    </LinearLayout>
 
-    <Button
-        android:id="@+id/query_btn"
-        android:layout_height="wrap_content"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:text="Query"/>
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-    <Button
-        android:id="@+id/upload_btn"
-        android:layout_height="wrap_content"
-        android:layout_width="match_parent"
-        android:text="Upload Folder"/>
+        <Button
+            android:id="@+id/create_folder"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Create Folder"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/open_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Open"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/create_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Create"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/save_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Save"
+            android:textSize="12sp" />
+
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-
-        <EditText
-            android:id="@+id/file_title_edittext"
-            android:layout_height="wrap_content"
-            android:layout_width="0dp"
-            android:layout_weight="1"/>
-
-        <ScrollView
-            android:layout_height="wrap_content"
-            android:layout_width="0dp"
+        <Button
+            android:id="@+id/query_btn"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_margin="6dp"
             android:layout_weight="1"
-            >
+            android:background="#009900"
+            android:text="Query" />
 
+        <Button
+            android:id="@+id/upload_btn"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_margin="6dp"
+            android:layout_weight="1"
+            android:background="#aa0000"
+            android:text="Upload Folder" />
+
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/file_title_edittext"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="0dp"
+        android:textSize="10sp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
         <EditText
             android:id="@+id/doc_content_edittext"
-            android:layout_height="wrap_content"
             android:layout_width="match_parent"
-            />
+            android:layout_height="wrap_content"
+            android:textSize="8sp" />
 
-        </ScrollView>
-
-
-    </LinearLayout>
+    </ScrollView>
 
 </LinearLayout>

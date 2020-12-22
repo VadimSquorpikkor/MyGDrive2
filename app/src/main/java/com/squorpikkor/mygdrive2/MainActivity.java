@@ -28,11 +28,13 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.FileList;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import static android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION;
 
@@ -151,6 +153,9 @@ public class MainActivity extends AppCompatActivity {
 //        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir, "20201208_152907"), null));
         findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir.toString()), null));
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
+        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderId(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
+        findViewById(R.id.create_folder_2).setOnClickListener(view -> mDriveServiceHelper.createFolderInDrive());
+//        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderIdNew(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
 
         // Authenticate the user. For most apps, this should be done when the user performs an
         // action that requires Drive access rather than in onCreate.
@@ -195,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
                 if (resultCode == Activity.RESULT_OK && resultData != null) {
                     Uri uri = resultData.getData();
                     if (uri != null) {
-                        uploadFile(new java.io.File(Environment.getExternalStorageDirectory(), "nuclib.txt"));
+                        uploadFile(new java.io.File(Environment.getExternalStorageDirectory(), "nuclib.txt"), MIME_TEXT_FILE, null);
 //                        uploadFile(new java.io.File(uri.getPath()));
                     }
                 }
@@ -326,30 +331,54 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void uploadFile(java.io.File localFile) {
+    /*private void uploadFile(java.io.File localFile) {
         Log.e(TAG, "upload: TRY");
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Uploading a file.");
 
             mDriveServiceHelper.uploadFile(localFile, MIME_TEXT_FILE, null)
-                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
+                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)*//*readFile(fileId)*//*)
                     .addOnFailureListener(exception ->
                             Log.e(TAG, "Couldn't create file.", exception));
         }
-    }
+    }*/
 
     //альтернативная версия
-    private void uploadFile(java.io.File localFile, String type) {
+    /*private void uploadFile(java.io.File localFile, String type) {
         Log.e(TAG, "upload: TRY");
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Uploading a file.");
 
             mDriveServiceHelper.uploadFile(localFile, type)
-                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
+                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)*//*readFile(fileId)*//*)
                     .addOnFailureListener(exception ->
                             Log.e(TAG, "Couldn't create file.", exception));
         }
-    }
+    }*/
+
+
+    //squorpikkor Не корректно работает, скидывает все файлы в корень, игнорируя папки
+    //косяк в том, что папки создаутся в отдельном треде, а файлы начинают аплодиться в главном треде не дожидаясь пока метод загрузки вернет id созданной папки
+    /*private void uploadFolder(java.io.File folder, String mainId) { //
+        Log.e(TAG, "upload: TRY");
+        String name = folder.getName();
+        Log.e(TAG, "uploadFolder: FOLDER NAME = " + name);
+        Log.e(TAG, "uploadFolder: FOLDER PATH = " + folder.getAbsolutePath());
+        String id = createFolder(name, mainId);//создать папку с именем и ID папки родителя. Получить id новой папки
+
+        Log.e(TAG, "uploadFolder: FOLDER ID = " + id);
+        java.io.File[] files = folder.listFiles(); //получить список файлов в папке, которую надо скопировать
+        Log.e(TAG, "uploadFolder: files.size = " + files.length);
+//        Log.e(TAG, "uploadFolder:  files.size = " + new java.io.File(Environment.getExternalStorageDirectory().getAbsolutePath()).listFiles().length);
+        for (java.io.File file : files) {
+            file.getName();
+            Log.e(TAG, "........... id = " + id);
+            if (!file.isDirectory())
+                uploadFile(file, MIME_TEXT_FILE, id); //если это файл, аплодить его в папку с id новой папки
+            else
+                uploadFolder(file, id);//если это директория, то рекурсивно вызывается весь метод uploadFolder
+        }
+    }*/
 
     //альтернативная версия 2
     private void uploadFile(java.io.File localFile, String type, String id) {
@@ -361,27 +390,6 @@ public class MainActivity extends AppCompatActivity {
                     .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
                     .addOnFailureListener(exception ->
                             Log.e(TAG, "Couldn't create file.", exception));
-        }
-    }
-
-    //squorpikkor Не корректно работает, скидывает все файлы в корень, игнорируя папки
-    //косяк в том, что папки создаутся в отдельном треде, а файлы начинают аплодиться в главном треде не дожидаясь пока метод загрузки вернет id созданной папки
-    private void uploadFolder(java.io.File folder, String mainId) { //
-        Log.e(TAG, "upload: TRY");
-        String name = folder.getName();
-        Log.e(TAG, "uploadFolder: FOLDER NAME = " + name);
-        Log.e(TAG, "uploadFolder: FOLDER PATH = " + folder.getAbsolutePath());
-        String id = createFolder(name, mainId);//создать папку с именем и ID папки родителя. Получить id новой папки
-
-        Log.e(TAG, "uploadFolder: FOLDER ID = " + id);
-        java.io.File[] files = folder.listFiles(); //получить список файлов в папке, которую надо скопировать
-        Log.e(TAG, "uploadFolder: files.size = " + files.length);
-//        Log.e(TAG, "uploadFolder:  files.size = " + new java.io.File(Environment.getExternalStorageDirectory().getAbsolutePath()).listFiles().length);
-        for (java.io.File file:files) {
-            file.getName();
-            Log.e(TAG, "........... id = " + id);
-            if (!file.isDirectory()) uploadFile(file, MIME_TEXT_FILE, id); //если это файл, аплодить его в папку с id новой папки
-            else uploadFolder(file, id);//если это директория, то рекурсивно вызывается весь метод uploadFolder
         }
     }
 
@@ -446,20 +454,26 @@ public class MainActivity extends AppCompatActivity {
         if (mDriveServiceHelper != null) {
             Log.d(TAG, "Querying for files.");
 
+            //Перечень доступных свойств настраивается в mDriveService.files().list().setFields("files( ЗДЕСЬ )").execute()); (см. queryFiles())
+
             mDriveServiceHelper.queryFiles()
                     .addOnSuccessListener(fileList -> {
                         StringBuilder builder = new StringBuilder();
                         for (File file : fileList.getFiles()) {
-//                            if (file.isEmpty()) builder.append("empty").append("\n");
-                            //if (file.getExplicitlyTrashed()) builder.append("e_thrashed").append("\n");
-//                            if (file.getTrashed()) builder.append("thrashed").append("\n");
-//                            builder.append(file.getDescription()).append("\n");
-//                            builder.append(file.getKind()).append("\n");
-//                            builder.append(file.getFileExtension()).append("\n");
-                            builder.append(file.getMimeType()).append("\n");
-//                            builder.append(file.getSize()).append("\n");
-//                            builder.append(file.getId()).append("\n");
-                            builder.append(file.getName()).append("\n");
+                            if (/*file.getTrashed()!=null && */!file.getTrashed()){
+//                                builder.append("trashed\n");}
+//                                else {
+                                builder.append(file.getName()).append(" - ");
+                                builder.append(file.getMimeType()).append(" - ");
+                                if (file.getParents() == null) {
+                                    builder.append("no_parents\n");
+                                } else {
+                                    builder.append(file.getParents().get(0)).append(" - ");
+                                    builder.append(file.getParents().size()).append("\n");
+                                }
+//                              builder.append(file.getSize()).append("\n");
+//                              builder.append(file.getId()).append("\n");
+                            }
                         }
                         String fileNames = builder.toString();
 
@@ -472,6 +486,154 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
+
+    List<File> getDriveFileList() {
+        List<File>[] temp = new List[0];
+        if (mDriveServiceHelper != null) {
+
+            //Перечень доступных свойств настраивается в mDriveService.files().list().setFields("files( ЗДЕСЬ )").execute()); (см. queryFiles())
+            mDriveServiceHelper.queryFiles()
+                    .addOnSuccessListener(fileList -> {
+                        temp[0] = fileList.getFiles();
+                    })
+                    .addOnFailureListener(exception -> Log.e(TAG, "Unable to query files.", exception));
+        }
+        return temp[0];
+    }
+
+    List<File> temporally;
+    List<File> getDriveFileListByParentID(String id) {
+//        List<File>[] temp = new List[1];
+        if (mDriveServiceHelper != null) {
+
+            //Перечень доступных свойств настраивается в mDriveService.files().list().setFields("files( ЗДЕСЬ )").execute()); (см. queryFiles())
+            mDriveServiceHelper.queryFiles()
+                    .addOnSuccessListener(fileList -> {
+                        Log.e(TAG, "...ON SUCCESS...");
+                        List<File> allFiles = fileList.getFiles();
+                        for (File file:allFiles) {
+                            Log.e(TAG, ".....all" + file.getName());
+                        }
+                        List<File> selectedFiles = new ArrayList<>();
+                        for (File file : allFiles) {
+                            if (!file.getTrashed() && file.getParents().get(0).equals(id)){
+                                selectedFiles.add(file);
+                                Log.e(TAG, "..........file: " + file.getName());
+                            }
+                        }
+//                        temp[0] = selectedFiles;
+                        temporally = selectedFiles;
+                    })
+                    .addOnFailureListener(exception -> Log.e(TAG, "Unable to query files.", exception));
+        }
+//        return temp[0];
+        return temporally;
+    }
+
+    void getGoogleFolderIdNew(java.io.File inputFile) {
+
+        String path = inputFile.getAbsolutePath();
+        Log.e(TAG, "getGoogleFolderId: PATH = " + path);
+        ArrayList<String> parentList = new ArrayList<>();
+//        Log.e(TAG, "getGoogleFolderId: PARENTS = " + path.replace(sMainDir.getAbsolutePath(), "").replace(file.getName(), ""));
+        path = path.replace(sMainDir.getAbsolutePath() + "/", "").replace(inputFile.getName(), "");
+        Log.e(TAG, "getGoogleFolderId: PATH = " + path);
+        String[] s = path.split("/");
+        parentList.add("com.atomtex.ascanner");//в самое начало закидываю самую первую папку
+        for (int i = 0; i < s.length; i++) {
+            parentList.add(s[i]);
+        }
+        for (int i = 0; i < parentList.size(); i++) {
+            Log.e(TAG, ".....parentList(" + i + ") = " + parentList.get(i));
+        }
+        String id;
+        id = "root";
+
+
+//        List<File>[] temp = new List[1];
+        if (mDriveServiceHelper != null) {
+
+            //Перечень доступных свойств настраивается в mDriveService.files().list().setFields("files( ЗДЕСЬ )").execute()); (см. queryFiles())
+            mDriveServiceHelper.queryFiles()
+                    .addOnSuccessListener(fileList -> {
+                        Log.e(TAG, "...ON SUCCESS...");
+                        List<File> allFiles = fileList.getFiles();
+                        for (File file:allFiles) {
+                            Log.e(TAG, ".....all" + file.getName());
+                        }
+                        List<File> selectedFiles = new ArrayList<>();
+                        for (File file : allFiles) {
+                            if (!file.getTrashed() && file.getParents().get(0).equals(id)){
+                                selectedFiles.add(file);
+                                Log.e(TAG, "..........file: " + file.getName());
+                            }
+                        }
+                        //////////////////////getNew(selectedFiles, parentList);
+                    })
+                    .addOnFailureListener(exception -> Log.e(TAG, "Unable to query files.", exception));
+        }
+    }
+
+    String searchIdByName(String name, List<File> list) {
+        for (File file:list) {
+            if (file.getName().equals(name)) return file.getId();
+        }
+        return "root";
+    }
+
+    /*void getNew(List<File> allFiles, ArrayList<String> parentList) {
+
+        for (int i = 0; i < parentList.size(); i++) {
+            driveFileList = getDriveFileListByParentID(id);
+            Log.e(TAG, "driveFileList.size: " + driveFileList.size());
+            id = searchIdByName(parentList.get(0), driveFileList);
+        }
+        Log.e(TAG, "getGoogleFolderId: RETURNED ID = " + id);
+
+    }*/
+
+    /*List<File> getDriveFileListByParentID(List<File> allFiles, String parent) {
+        List<File> list = new ArrayList<>();
+        for (File file:allFiles) {
+            if (file.getName().equals(parent))list.add(file)
+        }
+
+        for (int i = 0; i < parentList.size(); i++) {
+            driveFileList = getDriveFileListByParentID(id);
+            Log.e(TAG, "driveFileList.size: " + driveFileList.size());
+            id = searchIdByName(parentList.get(0), driveFileList);
+        }
+    }*/
+
+    void /*String*/ getGoogleFolderId(java.io.File file) {
+        String path = file.getAbsolutePath();
+        Log.e(TAG, "getGoogleFolderId: PATH = " + path);
+        ArrayList<String> parentList = new ArrayList<>();
+//        Log.e(TAG, "getGoogleFolderId: PARENTS = " + path.replace(sMainDir.getAbsolutePath(), "").replace(file.getName(), ""));
+        path = path.replace(sMainDir.getAbsolutePath() + "/", "").replace(file.getName(), "");
+        Log.e(TAG, "getGoogleFolderId: PATH = " + path);
+        String[] s = path.split("/");
+        parentList.add("com.atomtex.ascanner");//в самое начало закидываю самую первую папку
+        for (int i = 0; i < s.length; i++) {
+            parentList.add(s[i]);
+        }
+        for (int i = 0; i < parentList.size(); i++) {
+            Log.e(TAG, ".....parentList(" + i + ") = " + parentList.get(i));
+        }
+        String id;
+        id = "root";
+        List<File> driveFileList;
+        //todo два цикла закинуть в один
+        for (int i = 0; i < parentList.size(); i++) {
+            driveFileList = getDriveFileListByParentID(id);
+            Log.e(TAG, "driveFileList.size: " + driveFileList.size());
+            id = searchIdByName(parentList.get(0), driveFileList);
+        }
+        Log.e(TAG, "getGoogleFolderId: RETURNED ID = " + id);
+
+    }
+
     // squorpikkor
     // Метод работает в связке с uploadFolderNew
     // Загружается папка вместе с подпапками и файлами в ней
@@ -480,26 +642,69 @@ public class MainActivity extends AppCompatActivity {
     // при успешном создании в эту папку закидываются файлы из списка файлов папки
     // Т.е. каждая папка открывает свой собственный тред для загрузки
     // подпапки загружаются рекурсивно
+
+    //Добавлено: если папка с таким именем уже существует, то загружаться не будет
+    //Надо добавить: если папка существует, то брать её id и продолжать делать дерево папок дальше, ведь папка может и существовать, но подпапки еще нет, то есть надо проверять папку дальше, в подпапки
+    //Надо добавить: проверять папку не только по имени, но и по id родителя — может быть папка с таким же именем, но в другом месте
     private void createFolderNew(java.io.File folder, String folderId) {
         Log.e(TAG, "createFolder: TRY");
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Creating a folder.");
 
-            mDriveServiceHelper.createFolder(folder.getName(), folderId)
+
+
+            mDriveServiceHelper.checkIfExist(folder.getName()).addOnSuccessListener(fileList -> {
+                Log.e(TAG, "createFolderNew: fileList - " + fileList);
+                Log.e(TAG, "createFolderNew: fileList.getFiles() - " + fileList.getFiles());
+                Log.e(TAG, "createFolderNew: fileList.getFiles().size() - " + fileList.getFiles().size());
+                if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
+                    Log.e(TAG, ".....FILE NOT EXISTS!!!");
+
+
+
+                    mDriveServiceHelper.createFolder(folder.getName(), folderId)
+                            .addOnSuccessListener(fileId -> {
+                                Log.e(TAG, "createFolder ID = : " + fileId);
+
+                                for (java.io.File file : folder.listFiles()) {
+                                    file.getName();
+                                    Log.e(TAG, "........... id = " + fileId);
+                                    if (!file.isDirectory())
+                                        uploadFile(file, MIME_TEXT_FILE, fileId); //если это файл, аплодить его в папку с id новой папки
+                                    else
+                                        uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
+                                }
+
+                            })
+                            .addOnFailureListener(exception -> {
+                                Log.e(TAG, "Couldn't create folder.", exception);
+                            });
+
+
+
+                } else Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+
+            });
+
+
+
+            /*mDriveServiceHelper.createFolder(folder.getName(), folderId)
                     .addOnSuccessListener(fileId -> {
                         Log.e(TAG, "createFolder ID = : " + fileId);
 
-                        for (java.io.File file:folder.listFiles()) {
+                        for (java.io.File file : folder.listFiles()) {
                             file.getName();
                             Log.e(TAG, "........... id = " + fileId);
-                            if (!file.isDirectory()) uploadFile(file, MIME_TEXT_FILE, fileId); //если это файл, аплодить его в папку с id новой папки
-                            else uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
+                            if (!file.isDirectory())
+                                uploadFile(file, MIME_TEXT_FILE, fileId); //если это файл, аплодить его в папку с id новой папки
+                            else
+                                uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
                         }
 
                     })
-                    .addOnFailureListener(exception ->{
+                    .addOnFailureListener(exception -> {
                         Log.e(TAG, "Couldn't create folder.", exception);
-                    });
+                    });*/
         }
 
     }
@@ -516,10 +721,10 @@ public class MainActivity extends AppCompatActivity {
                         id[0] = fileId;
                         /*readFile(fileId)*/
                     })
-                    .addOnFailureListener(exception ->{
+                    .addOnFailureListener(exception -> {
                         Log.e(TAG, "Couldn't create folder.", exception);
 //                        id[0] = "0";
-                        });
+                    });
         }
 
 //        if (!id[0].equals("0") && id[0]!=null)return id[0];
@@ -537,7 +742,8 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         if (id.equals("0"))return null;
-        else */return id[0];
+        else */
+        return id[0];
     }
 
     /**
@@ -561,7 +767,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Sets up a FileObserver to watch the current directory.
      */
-    private FileObserver createFileObserver(final String dirPath) {
+    /*private FileObserver createFileObserver(final String dirPath) {
         Log.e(TAG, "♦♦♦createFileObserver: START");
         return new FileObserver(dirPath, FileObserver.CREATE | FileObserver.DELETE
                 | FileObserver.MOVED_FROM | FileObserver.MOVED_TO) {
@@ -575,7 +781,7 @@ public class MainActivity extends AppCompatActivity {
                 if (file.isDirectory()) {
                     Log.e(TAG, "" + file.getAbsolutePath() + " IS DIRECTORY");
 //                    uploadFolder(file, ROOT_FOLDER_ID);
-                    uploadFolder(new java.io.File(dirPath + "/" + name + "/"), ROOT_FOLDER_ID);
+                    uploadFolderNew(new java.io.File(dirPath + "/" + name + "/"), ROOT_FOLDER_ID);
 //                    uploadFile(file, MIME_FOLDER);
                 } else {
                     Log.e(TAG, "" + file.getAbsolutePath() + " IS FILE");
@@ -583,6 +789,32 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
+
+    }*/
+
+    private RecursiveFileObserver createFileObserver(final String dirPath) {
+        Log.e(TAG, "♦♦♦createFileObserver: START");
+        return new RecursiveFileObserver(dirPath, FileObserver.CREATE | FileObserver.DELETE
+                | FileObserver.MOVED_FROM | FileObserver.MOVED_TO) {
+
+            @Override
+            public void onEvent(final int event, final String name) {
+                Log.e(TAG, "♦♦♦onEvent: " + event);
+
+                java.io.File file = new java.io.File(name);
+                Log.e(TAG, "onEvent: Path = " + name);
+                if (file.isDirectory()) {
+                    Log.e(TAG, "" + file.getAbsolutePath() + " IS DIRECTORY");
+//                    uploadFolder(file, ROOT_FOLDER_ID);
+                    uploadFolderNew(new java.io.File(name + "/"), ROOT_FOLDER_ID);
+//                    uploadFile(file, MIME_FOLDER);
+                } else {
+                    Log.e(TAG, "" + file.getAbsolutePath() + " IS FILE");
+                    uploadFile(file, MIME_TEXT_FILE, null);
+                }
+            }
+        };
+
     }
 
 }

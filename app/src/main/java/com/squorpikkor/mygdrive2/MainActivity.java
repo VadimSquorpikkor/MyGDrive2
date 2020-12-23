@@ -422,15 +422,34 @@ public class MainActivity extends AppCompatActivity {
     }*/
 
     //альтернативная версия 2
-    private void uploadFile(java.io.File localFile, String type, String id) {
+    //Перед созданием файла проверяется (checkIfExist), если такой файл уже существует, то создаваться не будет.
+    // При этом проверяется не весь список имен, а только список имен у родителя, потому как файл с таким именем может быть где-то
+    // в другом месте (если бы проверялось по списку всех имен, файл не был бы создан, хоть в текущей директории такого файла и нет)
+    //Метод uploadFile получает через метод checkIfExist список всех файлов с именем localFile.getName() при этом все эти файлы только для родителя с id = file_Id
+    // Т.е. перед тем как создать файл "New" в папке "Folder" получаю список всех файлов с именем "New", находящихся в этой папке (на gDrive может в одной директории находиться несколько
+    // файлов с одинаковым названием, здесь имя — это НЕ уникальный идентификатор, роль которого выполняет ID)
+    // и, если таких файлов нет ни одного, создается.
+    // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
+    private void uploadFile(java.io.File localFile, String type, String file_Id) {
         Log.e(TAG, "upload: TRY");
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Uploading a file.");
 
-            mDriveServiceHelper.uploadFile(localFile, MIME_TEXT_FILE, id)
-                    .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
-                    .addOnFailureListener(exception ->
-                            Log.e(TAG, "Couldn't create file.", exception));
+            mDriveServiceHelper.checkIfExist(localFile.getName(), file_Id).addOnSuccessListener(fileList -> {
+
+                if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
+                    Log.e(TAG, ".....FILE NOT EXISTS!!!");
+
+                    mDriveServiceHelper.uploadFile(localFile, type, file_Id)
+                            .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
+                            .addOnFailureListener(exception ->
+                                    Log.e(TAG, "Couldn't create file.", exception));
+
+                } else {
+                    Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+                }
+
+            });
         }
     }
 
@@ -491,6 +510,9 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Queries the Drive REST API for files visible to this app and lists them in the content view.
      */
+    //Функция выводит в EditText список файлов на gDrive. Функция для проверки, работает не совсем корректно, но она и не будет нужна
+    //Косяк в том, что выводится не весь список (только сколько влезит в EditText)
+    //Для просмотра всего списка смотреть Лог
     private void query() {
         if (mDriveServiceHelper != null) {
             Log.d(TAG, "Querying for files.");
@@ -506,16 +528,19 @@ public class MainActivity extends AppCompatActivity {
 //                                else {
                                 builder.append(file.getName()).append(" - ");
                                 builder.append(file.getMimeType()).append(" - ");
-                                if (file.getParents() == null) {
+                                /*if (file.getParents() == null) {
                                     builder.append("no_parents\n");
                                 } else {
                                     builder.append(file.getParents().get(0)).append(" - ");
                                     builder.append(file.getParents().size()).append("\n");
-                                }
+                                }*/
 //                              builder.append(file.getSize()).append("\n");
-                              builder.append(file.getId()).append("\n");
+                                String parent;
+                                if (file.getParents() == null) parent = "no_parents";
+                                else parent = file.getParents().get(0);
+                                builder.append(file.getId()).append("\n");
+                                Log.e(TAG, "query: " + file.getName() + " " + file.getMimeType() + " " + file.getId() + " parent: " + parent);
                             }
-                            Log.e(TAG, "query: " + file.getName() + " " + file.getMimeType() + " " + file.getId());
                         }
                         String fileNames = builder.toString();
 
@@ -693,13 +718,6 @@ public class MainActivity extends AppCompatActivity {
     // Т.е. перед тем как создать папку "New" в папке "Folder" получаю список всех файлов с именем "New", находящихся в этой папке (на gDrive может в одной директории находиться несколько
     // файлов с одинаковым названием, здесь имя — это НЕ уникальный идентификатор, роль которого выполняет ID) и, если таких файлов нет ни одного, создается.
     // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
-
-    //Добавлено: если папка с таким именем уже существует, то загружаться не будет
-    //(Исправлено) Надо добавить: если папка существует, то брать её id и продолжать делать дерево папок дальше, ведь папка может и существовать, но подпапки еще нет, то есть надо проверять папку дальше, в подпапки
-    //(Исправлено) Надо добавить: проверять папку не только по имени, но и по id родителя — может быть папка с таким же именем, но в другом месте
-    //(Исправлено) Исправить: при аплоде папки если в текущей директории такой папки не существует, то она будет создана, НО!!! если папка с таким именем есть где то ещё в другом месте, то она НЕ БУДЕТ СОЗДАНА
-    //  это решается проверкой найденой папки по id родителя
-    //Надо добавить: сделать всё то же для файлов
     private void createFolderNew(java.io.File folder, String folderId) {
         Log.e(TAG, "createFolder: TRY");
         if (mDriveServiceHelper != null) {
@@ -707,13 +725,9 @@ public class MainActivity extends AppCompatActivity {
 
 
             mDriveServiceHelper.checkIfExist(folder.getName(), folderId).addOnSuccessListener(fileList -> {
-                Log.e(TAG, "createFolderNew: fileList - " + fileList);
-                Log.e(TAG, "createFolderNew: fileList.getFiles() - " + fileList.getFiles());
-                Log.e(TAG, "createFolderNew: fileList.getFiles().size() - " + fileList.getFiles().size());
 
                 if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
                     Log.e(TAG, ".....FILE NOT EXISTS!!!");
-
 
                     mDriveServiceHelper.createFolder(folder.getName(), folderId)
                             .addOnSuccessListener(fileId -> {

@@ -11,7 +11,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.FileObserver;
 import android.util.Log;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -20,15 +19,12 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.Scope;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
-import com.google.api.services.drive.model.FileList;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -81,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
 
     private FirebaseAuth mAuth;
 
-    private FileObserver mFileObserver;
+    private RecursiveFileObserver mFileObserver;
 
     public static final String DIRECTORY = "Android/data/com.atomtex.ascanner";
     //public static final String APP_DIR = Environment.getExternalStorageDirectory() + DIRECTORY;
@@ -876,27 +872,32 @@ public class MainActivity extends AppCompatActivity {
     }*/
     private RecursiveFileObserver createFileObserver(final String dirPath) {
         Log.e(TAG, "♦♦♦createFileObserver: START");
-        return new RecursiveFileObserver(dirPath, FileObserver.CREATE | FileObserver.DELETE
-                | FileObserver.MOVED_FROM | FileObserver.MOVED_TO) {
+        return new RecursiveFileObserver(dirPath, RecursiveFileObserver.CREATE | RecursiveFileObserver.DELETE
+                | RecursiveFileObserver.MOVED_FROM | RecursiveFileObserver.MOVED_TO) {
 
             @Override
             public void onEvent(final int event, final String name) {
                 Log.e(TAG, "♦♦♦onEvent: " + event);
 
-                java.io.File file = new java.io.File(name);
+                //Банальный, тупой но рабочий способ загрузки изменений в локальной папке на gDrive:
+                //При срабатывании Обсервера начинается загрузка ВСЕЙ папки, так как будут загружаться только файлы,
+                // которых нет на gDrive (так работает мой аплод), то в итоге загрузятся только те файлы, которых нет на gDrive
+                // т.е. при добавлении файла этот файл автоматом загружается в соответствующую папку.
+                // минус в том, что при срабатывании Обсервера будут перебираться на совпадение ВСЕ папки
+                uploadFolderNew(new java.io.File(sMainDir.toString()), null);
+
+                //Не удалять, из этого надо сделать что-то рабочее
+                /*java.io.File file = new java.io.File(name);
                 Log.e(TAG, "onEvent: Path = " + name);
                 if (file.isDirectory()) {
                     Log.e(TAG, "" + file.getAbsolutePath() + " IS DIRECTORY");
-//                    uploadFolder(file, ROOT_FOLDER_ID);
                     uploadFolderNew(new java.io.File(name + "/"), ROOT_FOLDER_ID);
-//                    uploadFile(file, MIME_FOLDER);
                 } else {
                     Log.e(TAG, "" + file.getAbsolutePath() + " IS FILE");
                     uploadFile(file, MIME_TEXT_FILE, null);
-                }
+                }*/
             }
         };
-
     }
 
 }

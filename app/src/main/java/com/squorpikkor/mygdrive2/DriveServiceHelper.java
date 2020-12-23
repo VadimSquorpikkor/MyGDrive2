@@ -231,9 +231,27 @@ public class DriveServiceHelper {
     }
 
     public Task<FileList> checkIfExist(String name/*, String parentId*/) {
+        //todo надо сделать query, который будет выбирать не только по имени, но и по id родителя
         Log.e(TAG, "checkIfExist");
 //        return Tasks.call(mExecutor, () -> mDriveService.files().list().setFields("files(id, name, parents, mimeType) and trashed=false and name='"+name+"'").execute());
-        return Tasks.call(mExecutor, () -> mDriveService.files().list().setQ("trashed=false and name='"+name+"'").execute());
+        return Tasks.call(mExecutor, () -> mDriveService.files().list()
+                .setFields("files(id, name, parents, mimeType, trashed)")
+                .setQ("trashed=false and name='"+name+"'")
+                .execute());
+    }
+
+    public Task<FileList> checkIfExist(String name, String parentId) {
+        //если parentId == null, то выбираем файлы в корне (id = "root")
+        Log.e(TAG, "checkIfExist");
+        String q = "trashed=false and name='"+name+"' and '"+parentId+"' in parents";
+        if (parentId == null) q = "trashed=false and name='"+name+"' and 'root' in parents";
+
+//        return Tasks.call(mExecutor, () -> mDriveService.files().list().setQ("trashed=false and name='"+name+"' and '"+parentId+"' in parents").setFields("files(id, name, parents, mimeType, trashed)").execute());
+        String finalQ = q;
+        return Tasks.call(mExecutor, () -> mDriveService.files().list()
+                .setQ(finalQ)
+                .setFields("files(id, name, parents, mimeType, trashed)")
+                .execute());
     }
 
     /**
@@ -341,7 +359,6 @@ public class DriveServiceHelper {
         }
         return existedFolder;
     }
-
 
 
 

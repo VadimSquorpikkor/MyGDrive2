@@ -154,12 +154,53 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir.toString()), null));
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
         findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderId(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
-        findViewById(R.id.create_folder_2).setOnClickListener(view -> mDriveServiceHelper.createFolderInDrive());
+//        findViewById(R.id.create_folder_2).setOnClickListener(view -> mDriveServiceHelper.createFolderInDrive());
+        findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderIdNew(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
 
         // Authenticate the user. For most apps, this should be done when the user performs an
         // action that requires Drive access rather than in onCreate.
         requestSignIn();
+    }
+
+    private void getFiles() {
+//        E/..........: ......file: nuclib.txt - 0 1PDWSeibe-xhFOkSaCE4wSN5xXZKMc-vL
+//        E/..........: ......file: nuclib.txt - 1 1VYjYywfc2yu1Xi-vAm4Bcfmmst_zyAFS
+//        E/..........: ......file: nuclib.txt - 2 17IqLtwR-9XK8EcMEtMhn_jTlYFw6YQqb
+//        E/..........: ......file: nuclib.txt - 3 13Tyb4-GJ2nX1hbs-wH6j9BFXH4ubfdot
+//        E/..........: ......file: nuclib.txt - 4 1iCCQUSv75XE06rc5BQ1P_fQdLS5Xju2h
+//        E/..........: ......file: nuclib.txt - 5 14W2pd6V3N2NWTcjhxl5LYpyve3L24HkE
+//        E/..........: ......file: nuclib.txt - 6 1VYjYywfc2yu1Xi-vAm4Bcfmmst_zyAFS
+//        E/..........: ......file: nuclib.txt - 7 17IqLtwR-9XK8EcMEtMhn_jTlYFw6YQqb
+//        E/..........: ......file: nuclib.txt - 8 1iCCQUSv75XE06rc5BQ1P_fQdLS5Xju2h
+//        E/..........: ......file: nuclib.txt - 9 14W2pd6V3N2NWTcjhxl5LYpyve3L24HkE
+//        E/..........: ......file: nuclib.txt - 10 1VYjYywfc2yu1Xi-vAm4Bcfmmst_zyAFS
+//        E/..........: ......file: nuclib.txt - 11 17IqLtwR-9XK8EcMEtMhn_jTlYFw6YQqb
+//        E/..........: ......file: nuclib.txt - 12 1iCCQUSv75XE06rc5BQ1P_fQdLS5Xju2h
+//        E/..........: ......file: nuclib.txt - 13 14W2pd6V3N2NWTcjhxl5LYpyve3L24HkE
+//        E/..........: ......file: nuclib.txt - 14 1VYjYywfc2yu1Xi-vAm4Bcfmmst_zyAFS
+//        E/..........: ......file: nuclib.txt - 15 17IqLtwR-9XK8EcMEtMhn_jTlYFw6YQqb
+//        E/..........: ......file: nuclib.txt - 16 1iCCQUSv75XE06rc5BQ1P_fQdLS5Xju2h
+//        E/..........: ......file: nuclib.txt - 17 14W2pd6V3N2NWTcjhxl5LYpyve3L24HkE
+//        String name = "nuclib.txt";
+        String name = "com.atomtex.ascanner";
+//        String id = "1ZDzWN2qNy_osWVMmh0y49ukDUtkS84aG";
+//        String id = "17IqLtwR-9XK8EcMEtMhn_jTlYFw6YQqb";
+//        String id = "1PDWSeibe-xhFOkSaCE4wSN5xXZKMc-vL";//20201208_153017
+        String id = "14W2pd6V3N2NWTcjhxl5LYpyve3L24HkE";//com.atomtex.ascanner
+        mDriveServiceHelper.checkIfExist(name, null).addOnSuccessListener(fileList -> {
+            Log.e(TAG, "createFolderNew: fileList - " + fileList);
+            Log.e(TAG, "createFolderNew: fileList size - " + fileList.getFiles().size());
+            String p;
+            for (int i = 0; i < fileList.getFiles().size(); i++) {
+
+                if (fileList.getFiles().get(i).getParents()==null)p="no_parents";
+                else p = fileList.getFiles().get(i).getParents().get(0);
+                Log.e(TAG, "......file: " + fileList.getFiles().get(i).getName() + " - " + i + " " + p);
+            }
+        })
+                .addOnFailureListener(exception ->
+                        Log.e(TAG, "косяк!!!", exception));
     }
 
     void selectAccount() {
@@ -460,7 +501,7 @@ public class MainActivity extends AppCompatActivity {
                     .addOnSuccessListener(fileList -> {
                         StringBuilder builder = new StringBuilder();
                         for (File file : fileList.getFiles()) {
-                            if (/*file.getTrashed()!=null && */!file.getTrashed()){
+                            if (/*file.getTrashed()!=null && */!file.getTrashed()) {
 //                                builder.append("trashed\n");}
 //                                else {
                                 builder.append(file.getName()).append(" - ");
@@ -472,8 +513,9 @@ public class MainActivity extends AppCompatActivity {
                                     builder.append(file.getParents().size()).append("\n");
                                 }
 //                              builder.append(file.getSize()).append("\n");
-//                              builder.append(file.getId()).append("\n");
+                              builder.append(file.getId()).append("\n");
                             }
+                            Log.e(TAG, "query: " + file.getName() + " " + file.getMimeType() + " " + file.getId());
                         }
                         String fileNames = builder.toString();
 
@@ -485,7 +527,6 @@ public class MainActivity extends AppCompatActivity {
                     .addOnFailureListener(exception -> Log.e(TAG, "Unable to query files.", exception));
         }
     }
-
 
 
     List<File> getDriveFileList() {
@@ -503,6 +544,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     List<File> temporally;
+
     List<File> getDriveFileListByParentID(String id) {
 //        List<File>[] temp = new List[1];
         if (mDriveServiceHelper != null) {
@@ -512,12 +554,12 @@ public class MainActivity extends AppCompatActivity {
                     .addOnSuccessListener(fileList -> {
                         Log.e(TAG, "...ON SUCCESS...");
                         List<File> allFiles = fileList.getFiles();
-                        for (File file:allFiles) {
+                        for (File file : allFiles) {
                             Log.e(TAG, ".....all" + file.getName());
                         }
                         List<File> selectedFiles = new ArrayList<>();
                         for (File file : allFiles) {
-                            if (!file.getTrashed() && file.getParents().get(0).equals(id)){
+                            if (!file.getTrashed() && file.getParents().get(0).equals(id)) {
                                 selectedFiles.add(file);
                                 Log.e(TAG, "..........file: " + file.getName());
                             }
@@ -559,12 +601,12 @@ public class MainActivity extends AppCompatActivity {
                     .addOnSuccessListener(fileList -> {
                         Log.e(TAG, "...ON SUCCESS...");
                         List<File> allFiles = fileList.getFiles();
-                        for (File file:allFiles) {
+                        for (File file : allFiles) {
                             Log.e(TAG, ".....all" + file.getName());
                         }
                         List<File> selectedFiles = new ArrayList<>();
                         for (File file : allFiles) {
-                            if (!file.getTrashed() && file.getParents().get(0).equals(id)){
+                            if (!file.getTrashed() && file.getParents().get(0).equals(id)) {
                                 selectedFiles.add(file);
                                 Log.e(TAG, "..........file: " + file.getName());
                             }
@@ -576,7 +618,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     String searchIdByName(String name, List<File> list) {
-        for (File file:list) {
+        for (File file : list) {
             if (file.getName().equals(name)) return file.getId();
         }
         return "root";
@@ -643,23 +685,34 @@ public class MainActivity extends AppCompatActivity {
     // Т.е. каждая папка открывает свой собственный тред для загрузки
     // подпапки загружаются рекурсивно
 
+    //Перед созданием папки проверяется (checkIfExist), если такая папка уже существует, то создаваться не будет.
+    // Если существует, продолжается проверка подпапки и т.д.
+    // При этом проверяется не весь список имен, а только список имен у родителя, потому как папка с таким именем может быть где-то
+    // в другом месте (если бы проверялось по списку всех имен, папка не была бы создана, хоть в текущей директории такой папки и нет)
+    //Метод createFolderNew рекурсивно получает через метод checkIfExist список всех файлов с именем folder.getName() при этом все эти файлы только для родителя с id = folderId
+    // Т.е. перед тем как создать папку "New" в папке "Folder" получаю список всех файлов с именем "New", находящихся в этой папке (на gDrive может в одной директории находиться несколько
+    // файлов с одинаковым названием, здесь имя — это НЕ уникальный идентификатор, роль которого выполняет ID) и, если таких файлов нет ни одного, создается.
+    // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
+
     //Добавлено: если папка с таким именем уже существует, то загружаться не будет
-    //Надо добавить: если папка существует, то брать её id и продолжать делать дерево папок дальше, ведь папка может и существовать, но подпапки еще нет, то есть надо проверять папку дальше, в подпапки
-    //Надо добавить: проверять папку не только по имени, но и по id родителя — может быть папка с таким же именем, но в другом месте
+    //(Исправлено) Надо добавить: если папка существует, то брать её id и продолжать делать дерево папок дальше, ведь папка может и существовать, но подпапки еще нет, то есть надо проверять папку дальше, в подпапки
+    //(Исправлено) Надо добавить: проверять папку не только по имени, но и по id родителя — может быть папка с таким же именем, но в другом месте
+    //(Исправлено) Исправить: при аплоде папки если в текущей директории такой папки не существует, то она будет создана, НО!!! если папка с таким именем есть где то ещё в другом месте, то она НЕ БУДЕТ СОЗДАНА
+    //  это решается проверкой найденой папки по id родителя
+    //Надо добавить: сделать всё то же для файлов
     private void createFolderNew(java.io.File folder, String folderId) {
         Log.e(TAG, "createFolder: TRY");
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Creating a folder.");
 
 
-
-            mDriveServiceHelper.checkIfExist(folder.getName()).addOnSuccessListener(fileList -> {
+            mDriveServiceHelper.checkIfExist(folder.getName(), folderId).addOnSuccessListener(fileList -> {
                 Log.e(TAG, "createFolderNew: fileList - " + fileList);
                 Log.e(TAG, "createFolderNew: fileList.getFiles() - " + fileList.getFiles());
                 Log.e(TAG, "createFolderNew: fileList.getFiles().size() - " + fileList.getFiles().size());
+
                 if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
                     Log.e(TAG, ".....FILE NOT EXISTS!!!");
-
 
 
                     mDriveServiceHelper.createFolder(folder.getName(), folderId)
@@ -681,8 +734,24 @@ public class MainActivity extends AppCompatActivity {
                             });
 
 
+                } else {
+                    Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
 
-                } else Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+                    //Если папка существует, берем её ID и перебираем её файлы и (если есть) подпапки
+
+                    String id = fileList.getFiles().get(0).getId();
+
+                    for (java.io.File file : folder.listFiles()) {
+                        file.getName();
+                        Log.e(TAG, "........... id = " + id);
+                        if (!file.isDirectory())
+                            uploadFile(file, MIME_TEXT_FILE, id); //если это файл, аплодить его в папку с id новой папки
+                        else
+                            uploadFolderNew(file, id);//если это директория, то вызывается весь метод uploadFolder
+                    }
+
+                }
+
 
             });
 
@@ -791,7 +860,6 @@ public class MainActivity extends AppCompatActivity {
         };
 
     }*/
-
     private RecursiveFileObserver createFileObserver(final String dirPath) {
         Log.e(TAG, "♦♦♦createFileObserver: START");
         return new RecursiveFileObserver(dirPath, FileObserver.CREATE | FileObserver.DELETE

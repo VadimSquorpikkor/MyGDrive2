@@ -230,8 +230,7 @@ public class DriveServiceHelper {
         return Tasks.call(mExecutor, () -> mDriveService.files().list().setFields("files(id, name, parents, mimeType, trashed)").execute()); //я изменил, теперь можно получать инфу: id, имя, id родителя, mime тип, удален ли файл
     }
 
-    public Task<FileList> checkIfExist(String name/*, String parentId*/) {
-        //todo надо сделать query, который будет выбирать не только по имени, но и по id родителя
+    public Task<FileList> checkIfExist(String name) {
         Log.e(TAG, "checkIfExist");
 //        return Tasks.call(mExecutor, () -> mDriveService.files().list().setFields("files(id, name, parents, mimeType) and trashed=false and name='"+name+"'").execute());
         return Tasks.call(mExecutor, () -> mDriveService.files().list()

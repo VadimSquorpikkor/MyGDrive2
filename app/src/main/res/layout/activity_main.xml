@@ -29,9 +29,11 @@
         <Button
             android:id="@+id/get_folder_id"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Get Folder id" />
+            android:background="#dddd00"
+            android:layout_height="32dp"
+            android:layout_margin="6dp"
+            android:text="Load Folder by Path" />
 
         <Button
             android:id="@+id/create_folder_2"

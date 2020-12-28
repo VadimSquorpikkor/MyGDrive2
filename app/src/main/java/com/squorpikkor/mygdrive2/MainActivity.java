@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.FileObserver;
 import android.util.Log;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -52,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
 
     final String API_KEI = "AIzaSyABrX6WwM2WQC2djvG6auBwgTQqZzL5_kw";
 
-    public static final String TAG = "..........";
+    public static final String TAG = "_";
 
     private static final int REQUEST_CODE_SIGN_IN = 1;
     private static final int REQUEST_CODE_OPEN_DOCUMENT = 2;
@@ -77,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
 
     private FirebaseAuth mAuth;
 
-    private RecursiveFileObserver mFileObserver;
+    private RecursiveFileObserverNew mFileObserver;
 
     public static final String DIRECTORY = "Android/data/com.atomtex.ascanner";
     //public static final String APP_DIR = Environment.getExternalStorageDirectory() + DIRECTORY;
@@ -150,7 +151,8 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir.toString()), null));
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderId(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
-        findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFolderByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeFolder2/")));
+//        findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeFolder2")));
+        findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeNewFile.txt")));
 //        findViewById(R.id.create_folder_2).setOnClickListener(view -> mDriveServiceHelper.createFolderInDrive());
         findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderIdNew(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
@@ -411,7 +413,7 @@ public class MainActivity extends AppCompatActivity {
     // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
     private void uploadFile(java.io.File localFile, String type, String file_Id) {
         Log.e(TAG, "upload: TRY");
-        if (mDriveServiceHelper != null) {
+        if (mDriveServiceHelper != null/* && !localFile.getName().equals("null")*/) {
             Log.e(TAG, "Uploading a file.");
 
             mDriveServiceHelper.checkIfExist(localFile.getName(), file_Id).addOnSuccessListener(fileList -> {
@@ -708,7 +710,6 @@ public class MainActivity extends AppCompatActivity {
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Creating a folder.");
 
-
             mDriveServiceHelper.checkIfExist(folder.getName(), folderId).addOnSuccessListener(fileList -> {
 
                 if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
@@ -718,13 +719,16 @@ public class MainActivity extends AppCompatActivity {
                             .addOnSuccessListener(fileId -> {
                                 Log.e(TAG, "createFolder ID = : " + fileId);
 
-                                for (java.io.File file : folder.listFiles()) {
-                                    file.getName();
-                                    Log.e(TAG, "........... id = " + fileId);
-                                    if (!file.isDirectory())
-                                        uploadFile(file, MIME_TEXT_FILE, fileId); //если это файл, аплодить его в папку с id новой папки
-                                    else
-                                        uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
+                                if (folder.listFiles() != null) {
+
+                                    for (java.io.File file : folder.listFiles()) {
+                                        file.getName();
+                                        Log.e(TAG, "........... id = " + fileId);
+                                        if (!file.isDirectory())
+                                            uploadFile(file, MIME_TEXT_FILE, fileId); //если это файл, аплодить его в папку с id новой папки
+                                        else
+                                            uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
+                                    }
                                 }
 
                             })
@@ -740,13 +744,16 @@ public class MainActivity extends AppCompatActivity {
 
                     String id = fileList.getFiles().get(0).getId();
 
-                    for (java.io.File file : folder.listFiles()) {
-                        file.getName();
-                        Log.e(TAG, "........... id = " + id);
-                        if (!file.isDirectory())
-                            uploadFile(file, MIME_TEXT_FILE, id); //если это файл, аплодить его в папку с id новой папки
-                        else
-                            uploadFolderNew(file, id);//если это директория, то вызывается весь метод uploadFolder
+                    if (folder.listFiles() != null) {
+
+                        for (java.io.File file : folder.listFiles()) {
+                            file.getName();
+                            Log.e(TAG, "........... id = " + id);
+                            if (!file.isDirectory())
+                                uploadFile(file, MIME_TEXT_FILE, id); //если это файл, аплодить его в папку с id новой папки
+                            else
+                                uploadFolderNew(file, id);//если это директория, то вызывается весь метод uploadFolder
+                        }
                     }
 
                 }
@@ -775,6 +782,43 @@ public class MainActivity extends AppCompatActivity {
                     });*/
         }
 
+    }
+
+    //Пусть будет
+//    private void createFolderAndStop(String name, String folderId) {
+    private void createFolderAndStop(java.io.File folder, String folderId) {
+        /*Log.e(TAG, "createFolder: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Creating a folder.");
+
+            mDriveServiceHelper.createFolder(name, folderId)
+                    .addOnSuccessListener(fileId -> {
+                        Log.e(TAG, "createFolder ID = : " + fileId);
+                    })
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "Couldn't create folder.", exception);
+                    });
+        }*/
+
+        //-------------------------------------------------
+
+        Log.e(TAG, "createFolder: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Creating a folder.");
+
+            mDriveServiceHelper.checkIfExist(folder.getName(), folderId).addOnSuccessListener(fileList -> {
+
+                if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
+                    Log.e(TAG, ".....FILE NOT EXISTS!!!");
+
+                    mDriveServiceHelper.createFolder(folder.getName(), folderId)
+                            .addOnSuccessListener(fileId -> Log.e(TAG, "createFolder ID = : " + fileId))
+                            .addOnFailureListener(exception -> Log.e(TAG, "Couldn't create folder.", exception));
+                } else {
+                    Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+                }
+            });
+        }
     }
 
     //Пусть будет
@@ -834,7 +878,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 //--------------------------------------------------------------------------------------------------
-    //Обертка для uploadFolderByFileList. В uploadFolderByFileList 3 параметра, к тому же этот метод рекурсивный и разделяется на потоки
+    //Обертка для uploadFolderByFileList. В uploadFolderByFileList 3 параметра, к тому же этот метод (uploadFolderByFileList) рекурсивный и разделяется на потоки
     //Чтобы было проще с ним работать сделан этот класс только с одним параметром на входе
     //В итоге получается метод, который на вход получает локальную папку, которая загружается на GDrive в
     //СООТВЕТСТВУЮЩУЮ папку, как она находится относительно главной папки (с которой идет синхронизация)
@@ -844,25 +888,37 @@ public class MainActivity extends AppCompatActivity {
     //Если кроме создаваемой папки нет на облаке и её родителя, он будет создан
     //Проблема, которую решает этод метод, в том, что на gDrive нет пути, есть только Id родителя, т.е. нельзя просто указать путь, по которому сохранять папку
 
-    void uploadFolderByFilePath(java.io.File local_folder) {
+    //Добавлена абилити загружать и файлы тоже (изначально только папки)
+    void uploadFileByFilePath(java.io.File local_folder) {
         String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath() + "/", "");
 //        if (local_folder.isDirectory()) cuttingPath+="/"; //если файл — это директория, то в конце пути добавляю "/"
         Log.e(TAG, "start");
         Log.e(TAG, "beforeCut: " + local_folder.getAbsolutePath());
         Log.e(TAG, "cuttingPath: " + cuttingPath);
+        Log.e(TAG, "-------IS FOLDER = " + local_folder.isDirectory());
         uploadFolderByFileList(local_folder, cuttingPath, null);
+//        if (local_folder.isDirectory()) uploadFolderByFileList(local_folder, cuttingPath, null);
+//        else uploadFileByFileList(local_folder, cuttingPath, null);
     }
 
     //Работает через обертку uploadFolderByFilePath. Описание см. там
+    //На вход в самый первый раз (до рекурсии) метод получает в переменную cuttingPath всегда полный путь МИНУС все что идет до синхронизируемой папки:
+    // если на телефоне файл лежит по адресу: /storage/emulated/0/Android/data/com.atomtex.com/folder/file.txt,
+    // то cuttingPath будет выглядеть: com.atomtex.com/folder/file.txt
+    // При каждом рекурсивном вызове uploadFolderByFileLis проверяется путь, если путь уже не содержит поддиректории (if (pathArr.length == 1)),
+    // то метод аплодит файл/папку по полученному ранее ID, иначе cuttingPath будет уменьшаться на одну директорию СЛЕВА и вместе с полученным ID
+    // будет рекурсивно вызван метод uploadFolderByFileList уже с новыми значениями ID и короткого пути
+    // Другими словами, метод рекурсивно перебирает названия папок на gDrive от синхронизируемой папки до самого последнего чайлда, каждый раз запоминая ID текущей папки
+    // И если чайлд оказался последним, то в папке с ID родителя создает файл (если его там ещё не было)
+    // Итого: метод загружает файл/папку в папку по ID этой целевой папки, зная только путь локальной папки на телефоне
     void uploadFolderByFileList(java.io.File local_folder, String cuttingPath, String file_Id) {
 
         String path_for_file = local_folder.getAbsolutePath().replace(cuttingPath, "");
-//        if (local_folder.isDirectory()) path_for_file+="/"; //если файл — это директория, то в конце пути добавляю "/"
         java.io.File file_cut = new java.io.File(path_for_file);
-
         Log.e(TAG, "file_cut path: " + file_cut.getAbsolutePath());
 
-        mDriveServiceHelper.checkIfExist(file_cut.getName(), file_Id).addOnSuccessListener(fileList -> {
+        mDriveServiceHelper.checkIfExist(file_cut.getName(),
+                file_Id).addOnSuccessListener(fileList -> {
             Log.e(TAG, "------------------------------------------------------");
             Log.e(TAG, "uploadFolderByFileList: ON SUCCESS: file_cut.getName() - " + file_cut.getName() + ", file_Id - " + file_Id);
             //получаю по имени файла и по ID родителя список файлов (вообще список всегда будет состоять только из одного ЕДИНСТВЕННОГО файла)
@@ -870,21 +926,35 @@ public class MainActivity extends AppCompatActivity {
             if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
                 //если не существует, создать папку с подпапками и закончить рекурсию (дальше уже не будет вызываться uploadFolderByFileList)
                 Log.e(TAG, ".....FILE NOT EXISTS ON CLOUD!!!");
+                //Вариант с рекуривным аплодом подпапок и файлов
+//                createFolderNew(file_cut, file_Id);
+                //Альтернативный вариант без рекуривного аплода подпапок и файлов
+//                createFolderAndStop(file_cut.getName(), file_Id);
+                //Альтернативный вариант без рекуривного аплода подпапок и файлов
+                createFolderAndStop(file_cut, file_Id);
 
-                createFolderNew(file_cut, file_Id);
+                //---------------------------------------------
+//                String[] pathArr = cuttingPath.split("/");
+//                String id = fileList.getFiles().get(0).getId();
+//                String newPath = cuttingPath.replace(pathArr[0]+"/", "");// folder_1/folder_2/folder_3 -> folder_2/folder_3
+//                Log.e(TAG, "NEW path - " + newPath);
+//                uploadFolderByFileList(local_folder, newPath, id);
+                //---------------------------------------------
+
+
+//                if (local_folder.isDirectory()) createFolderNew(file_cut, file_Id);
+//                else uploadFile(local_folder, MIME_TEXT_FILE, file_Id);
             } else {
                 Log.e(TAG, ".....FILE EXISTS ON CLOUD!!!");
                 String[] pathArr = cuttingPath.split("/");
-
                 String id = fileList.getFiles().get(0).getId();
 
                 if (pathArr.length == 1) {
                     Log.e(TAG, "uploadFolderByFileList: pathArr.length == 1");
-                    /////////createFolderNew(local_folder, file_Id);
-                    createFolderNew(local_folder, id);
+                    if (local_folder.isDirectory())createFolderNew(local_folder, id);
+                    else uploadFile(local_folder, MIME_TEXT_FILE, id);
                 } else {
                     Log.e(TAG, "uploadFolderByFileList: pathArr.length != 1");
-                    /////////String id = fileList.getFiles().get(0).getId();
                     Log.e(TAG, "OLD path - " + cuttingPath);
                     String newPath = cuttingPath.replace(pathArr[0]+"/", "");// folder_1/folder_2/folder_3 -> folder_2/folder_3
                     Log.e(TAG, "NEW path - " + newPath);
@@ -897,10 +967,10 @@ public class MainActivity extends AppCompatActivity {
 //--------------------------------------------------------------------------------------------------
 
 
-    private RecursiveFileObserver createFileObserver(final String dirPath) {
+    /*private RecursiveFileObserver createFileObserver(final String dirPath) {
         Log.e(TAG, "♦♦♦createFileObserver: START");
-        return new RecursiveFileObserver(dirPath, RecursiveFileObserver.CREATE | RecursiveFileObserver.DELETE
-                | RecursiveFileObserver.MOVED_FROM | RecursiveFileObserver.MOVED_TO) {
+        return new RecursiveFileObserver(dirPath, RecursiveFileObserver.CREATE*//* | RecursiveFileObserver.DELETE
+                | RecursiveFileObserver.MOVED_FROM | RecursiveFileObserver.MOVED_TO*//*) {
 
             @Override
             public void onEvent(final int event, final String name) {
@@ -911,32 +981,60 @@ public class MainActivity extends AppCompatActivity {
                 // которых нет на gDrive (так работает мой аплод), то в итоге загрузятся только те файлы, которых нет на gDrive
                 // т.е. при добавлении файла этот файл автоматом загружается в соответствующую папку.
                 // минус в том, что при срабатывании Обсервера будут перебираться на совпадение ВСЕ папки
-                uploadFolderNew(new java.io.File(sMainDir.toString()), null);
+                /////uploadFolderNew(new java.io.File(sMainDir.toString()), null);
 
-                //Не удалять, из этого надо сделать что-то рабочее
-                /*java.io.File file = new java.io.File(name);
-                Log.e(TAG, "onEvent: Path = " + name);
-                if (file.isDirectory()) {
-                    Log.e(TAG, "" + file.getAbsolutePath() + " IS DIRECTORY");
-                    uploadFolderNew(new java.io.File(name + "/"), ROOT_FOLDER_ID);
-                } else {
-                    Log.e(TAG, "" + file.getAbsolutePath() + " IS FILE");
-                    uploadFile(file, MIME_TEXT_FILE, null);
-                }*/
 
-                //Не удалять, из этого надо сделать что-то рабочее
-                java.io.File file = new java.io.File(name);
-                Log.e(TAG, "onEvent: Path = " + name);
-                if (file.isDirectory()) {
-                    Log.e(TAG, "" + file.getAbsolutePath() + " IS DIRECTORY");
-//                    uploadFolderByFilePath(new java.io.File(name + "/"), ROOT_FOLDER_ID);
-                    //////////uploadFolderByFilePath(new java.io.File(name + "/"));
-                } else {
-                    Log.e(TAG, "" + file.getAbsolutePath() + " IS FILE");
-                    //////////uploadFile(file, MIME_TEXT_FILE, null);
-                }
+                //Новая версия, при срабатывании Обсервера загружает файл или папку в конкретную директорию
+                Log.e(TAG, ". ......................................................onEvent: Path = " + name);
+                uploadFileByFilePath(new java.io.File(name));
+                //////startWatching();
+                //////mFileObserver = createFileObserver(sMainDir.getAbsolutePath());
+
             }
         };
+    }*/
+
+    private String returnEvent(int event) {
+        switch (event) {
+            case FileObserver.ACCESS:
+                return "ACCESS";
+            case FileObserver.MODIFY:
+                return "MODIFY";
+            case FileObserver.ATTRIB:
+                return "ATTRIB";
+            case FileObserver.CLOSE_WRITE:
+                return "CLOSE_WRITE";
+            case FileObserver.CLOSE_NOWRITE:
+                return "CLOSE_NOWRITE";
+            case FileObserver.OPEN:
+                return "OPEN";
+            case FileObserver.MOVED_FROM:
+                return "MOVED_FROM";
+            case FileObserver.MOVED_TO:
+                return "MOVED_TO";
+            case FileObserver.CREATE:
+                return "CREATE";
+            case FileObserver.DELETE:
+                return "DELETE";
+            case FileObserver.DELETE_SELF:
+                return "DELETE_SELF";
+            case FileObserver.MOVE_SELF:
+                return "MOVE_SELF";
+            case FileObserver.ALL_EVENTS:
+                return "ALL_EVENTS";
+            case 32768:
+                return "ERROR";
+            default:
+                return "unknown " + event;
+        }
+    }
+
+    private RecursiveFileObserverNew createFileObserver(final String dirPath) {
+        Log.e(TAG, "♦♦♦createFileObserver: START");
+        return new RecursiveFileObserverNew(dirPath, (event, file) -> {
+            Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
+            uploadFileByFilePath(file);
+        });
     }
 
 }

@@ -154,6 +154,12 @@ public class DriveServiceHelper {
                     .setMimeType(mimeType)
                     .setName(localFile.getName());
             FileContent fileContent = new FileContent(mimeType, localFile);
+            Log.e(TAG, "----------------------------------------");
+            Log.e(TAG, "|    uploadFile: " + localFile);
+            Log.e(TAG, "----------------------------------------");
+            Log.e(TAG, "|    uploadFile: " + localFile.getName());
+            Log.e(TAG, "----------------------------------------");
+
             File fileMeta = mDriveService.files().create(metadata, fileContent).execute();
 
             if (fileMeta == null) {

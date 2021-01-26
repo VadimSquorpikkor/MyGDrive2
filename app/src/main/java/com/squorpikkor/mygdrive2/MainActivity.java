@@ -961,8 +961,35 @@ public class MainActivity extends AppCompatActivity {
                     uploadFolderByFileList(local_folder, newPath, id);
                 }
             }
+        }).addOnFailureListener(exception -> {
+            Log.e(TAG, "CAN NOT uploadFolderByFileList", exception);
+            Log.e(TAG, "CAN NOT upload: " + local_folder + ", cuttingPath = " + cuttingPath + ", id = " + file_Id);
+            tryToUploadLater(local_folder, cuttingPath, file_Id);
         });
     }
+
+
+    //Если файл/папку не удалось загрузить, то вызывается этот метод
+    //Метод создает новый поток для каждого незагруженного файла, ждет 10 сек и пытается загрузить файл снова
+    // todo временная мера, надо сделать, чтобы путь для незагруженного файла сохранялся в файл и попытки загрузки шли по сохраненному в файл пути
+    //  так, файл будет дозагружен даже после перезапускав программы
+    void tryToUploadLater(java.io.File local_folder, String cuttingPath, String file_Id) {
+        Thread thread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    sleep(10000);
+                    Log.e(TAG, "--- try after 10 sec ---------" + local_folder.getName() + "------------");
+                    uploadFolderByFileList(local_folder, cuttingPath, file_Id);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        thread.start();
+    }
+
+
 
 //--------------------------------------------------------------------------------------------------
 

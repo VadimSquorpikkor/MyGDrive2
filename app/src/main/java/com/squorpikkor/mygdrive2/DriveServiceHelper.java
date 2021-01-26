@@ -78,29 +78,6 @@ public class DriveServiceHelper {
 
     }
 
-    /*public Task<String> createFolderIfNotExists(String name, String id) {
-        checkIfExist(name).addOnSuccessListener(fileList -> {
-            if (fileList != null && fileList.getFiles() != null && fileList.getFiles().size() != 0) {
-                Log.e(TAG, ".....FILE NOT EXISTS!!!");
-            } else Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
-
-        });
-
-        return Tasks.call(mExecutor, () -> {
-            File metadata = new File()
-                    .setParents(Collections.singletonList(fileId))
-                    .setMimeType("application/vnd.google-apps.folder")
-                    .setName(name);
-
-            File googleFile = mDriveService.files().create(metadata).execute();
-            if (googleFile == null) {
-                throw new IOException("Null result when requesting file creation.");
-            }
-
-            return googleFile.getId();
-        });
-    }*/
-
     /**
      * Creates a text file in the user's My Drive folder and returns its file ID.
      */

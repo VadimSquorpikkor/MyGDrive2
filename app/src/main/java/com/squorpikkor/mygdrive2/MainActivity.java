@@ -180,14 +180,14 @@ public class MainActivity extends AppCompatActivity {
                     while(true) {
                         sleep(10000);
 
-                        if (pathSet.size() > 0) {
-                            for (String s:pathSet) {
+                        if (errorPathSet.size() > 0) {
+                            for (String s:errorPathSet) {
                                 uploadFileByFilePath(new java.io.File(s));
                             }
                         }
 
                         Log.e(TAG, "");
-                        Log.e(TAG, "****************  "+pathSet.size()+"  *****************");
+                        Log.e(TAG, "****************  "+errorPathSet.size()+"  *****************");
                         Log.e(TAG, "");
                     }
                 } catch (InterruptedException e) {
@@ -199,10 +199,15 @@ public class MainActivity extends AppCompatActivity {
         thread.start();
     }
 
+
+
     void checkPathSetSize() {
-        Log.e(TAG, "****************  "+pathSet.size()+"  *****************");
-          if (pathSet.size() > 0) {
-              for (String s:pathSet) {
+        Log.e(TAG, "****************  "+errorPathSet.size()+"  *****************");
+        for (String s:errorPathSet) {
+            Log.e(TAG, "checkPathSetSize: " + s);
+        }
+          if (errorPathSet.size() > 0) {
+              for (String s:errorPathSet) {
                   uploadFileByFilePath(new java.io.File(s));
               }
           }
@@ -458,8 +463,7 @@ public class MainActivity extends AppCompatActivity {
     // и, если таких файлов нет ни одного, создается.
     // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
     private void uploadFile(java.io.File localFile, String type, String file_Id) {
-        //todo возможно здесь нужен будет pathSet.add(localFile.getAbsolutePath()), так как метод может быть вызван напрямую, а не через uploadFolderByFileList;
-        pathSet.add(localFile.getAbsolutePath());
+        /////////////////////////pathSet.add(localFile.getAbsolutePath());
         Log.e(TAG, "upload: TRY");
         if (mDriveServiceHelper != null/* && !localFile.getName().equals("null")*/) {
             Log.e(TAG, "Uploading a file.");
@@ -473,19 +477,23 @@ public class MainActivity extends AppCompatActivity {
                             .addOnSuccessListener(fileId -> {
                                 Log.e(TAG, "createFile ID = : " + fileId);
                                 Log.e(TAG, "uploadFile: файл "+localFile.getAbsolutePath()+" успешно загружен, удалить адрес из pathSet");
-                                Log.e(TAG, "uploadFile: pathSet.size() BEFORE = "+pathSet.size());
-                                pathSet.remove(localFile.getAbsolutePath());
-                                Log.e(TAG, "uploadFile: pathSet.size() AFTER = "+pathSet.size());
+                                Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
+                                errorPathSet.remove(localFile.getAbsolutePath());
+                                Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
                             }/*readFile(fileId)*/)
-                            .addOnFailureListener(exception ->
-                                    Log.e(TAG, "Couldn't create file.", exception));
+                            .addOnFailureListener(exception -> {
+                                Log.e(TAG, "Couldn't create file.", exception);
+                                errorPathSet.add(localFile.getAbsolutePath());
+                            });
 
                 } else {
                     Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
-                    pathSet.remove(localFile.getAbsolutePath());
+                    errorPathSet.remove(localFile.getAbsolutePath());
                 }
 
-            });
+            })
+                    .addOnFailureListener(exception ->
+                            errorPathSet.add(localFile.getAbsolutePath()));
         }
     }
 
@@ -762,7 +770,7 @@ public class MainActivity extends AppCompatActivity {
     // файлов с одинаковым названием, здесь имя — это НЕ уникальный идентификатор, роль которого выполняет ID) и, если таких файлов нет ни одного, создается.
     // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
     private void createFolderNew(java.io.File folder, String folderId) {
-        pathSet.add(folder.getAbsolutePath());
+        //////////////////////////pathSet.add(folder.getAbsolutePath());
         Log.e(TAG, "upload: TRY");
         Log.e(TAG, "uploadFolder: FOLDER NAME = " + folder.getName());
         Log.e(TAG, "uploadFolder: FOLDER PATH = " + folder.getAbsolutePath());
@@ -794,9 +802,8 @@ public class MainActivity extends AppCompatActivity {
                                 }
 
                             })
-                            .addOnFailureListener(exception -> {
-                                Log.e(TAG, "Couldn't create folder.", exception);
-                            });
+                            .addOnFailureListener(exception ->
+                                    errorPathSet.add(folder.getAbsolutePath()));
 
 
                 } else {
@@ -940,7 +947,7 @@ public class MainActivity extends AppCompatActivity {
         mOpenFileId = fileId;
     }
 
-    HashSet<String> pathSet = new HashSet<>();
+    HashSet<String> errorPathSet = new HashSet<>();
 //--------------------------------------------------------------------------------------------------
     //Обертка для uploadFolderByFileList. В uploadFolderByFileList 3 параметра, к тому же этот метод (uploadFolderByFileList) рекурсивный и разделяется на потоки
     //Чтобы было проще с ним работать сделан этот класс только с одним параметром на входе
@@ -953,8 +960,10 @@ public class MainActivity extends AppCompatActivity {
     //Проблема, которую решает этод метод, в том, что на gDrive нет пути, есть только Id родителя, т.е. нельзя просто указать путь, по которому сохранять папку
 
     //Добавлена абилити загружать и файлы тоже (изначально только папки)
+
+    //todo объединить с uploadFolderByFileList
     void uploadFileByFilePath(java.io.File local_folder) {
-        pathSet.add(local_folder.getAbsolutePath());
+        ///////////////////////pathSet.add(local_folder.getAbsolutePath());
         String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath() + "/", "");
 //        if (local_folder.isDirectory()) cuttingPath+="/"; //если файл — это директория, то в конце пути добавляю "/"
         Log.e(TAG, "start");
@@ -977,6 +986,14 @@ public class MainActivity extends AppCompatActivity {
     // И если чайлд оказался последним, то в папке с ID родителя создает файл (если его там ещё не было)
     // Итого: метод загружает файл/папку в папку по ID этой целевой папки, зная только путь локальной папки на телефоне
     void uploadFolderByFileList(java.io.File local_folder, String cuttingPath, String file_Id) {
+
+
+        Log.e(TAG, "                       '");
+        Log.e(TAG, "------ EXPERIMENT ------");
+        Log.e(TAG, "|   fileId = "+file_Id+" newPath = "+ cuttingPath);
+        Log.e(TAG, "------ EXPERIMENT ------");
+        Log.e(TAG, "                       '");
+
 
         String path_for_file = local_folder.getAbsolutePath().replace(cuttingPath, "");
         java.io.File file_cut = new java.io.File(path_for_file);
@@ -1030,6 +1047,7 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "CAN NOT uploadFolderByFileList", exception);
             Log.e(TAG, "CAN NOT upload: " + local_folder + ", cuttingPath = " + cuttingPath + ", id = " + file_Id);
             //todo///временно для проверки/////tryToUploadLater(local_folder, cuttingPath, file_Id);
+            errorPathSet.add(local_folder.getAbsolutePath());
         });
     }
 
@@ -1125,12 +1143,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
+
     private RecursiveFileObserverNew createFileObserver(final String dirPath) {
         Log.e(TAG, "♦♦♦createFileObserver: START");
         return new RecursiveFileObserverNew(dirPath, (event, file) -> {
             Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
             uploadFileByFilePath(file);
-//            pathSet.add(file.getAbsolutePath());
         });
     }
 

@@ -31,6 +31,7 @@ import com.google.firebase.auth.FirebaseUser;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 
 import static android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION;
@@ -148,18 +149,63 @@ public class MainActivity extends AppCompatActivity {
 //        findViewById(R.id.upload_btn).setOnClickListener(view -> openFilePickerToUpload());
 //        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolder(new java.io.File(sMainDir, "20201208_152907"), null));
 //        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir, "20201208_152907"), null));
-        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir.toString()), null));
+//        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolderNew(new java.io.File(sMainDir.toString()), null));
+        findViewById(R.id.upload_btn).setOnClickListener(view -> createFolderNew(new java.io.File(sMainDir.toString()), null));
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderId(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeFolder2")));
         findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeNewFile.txt")));
 //        findViewById(R.id.create_folder_2).setOnClickListener(view -> mDriveServiceHelper.createFolderInDrive());
         findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
+        findViewById(R.id.check_error_download).setOnClickListener(view -> checkPathSetSize());
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderIdNew(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
 
         // Authenticate the user. For most apps, this should be done when the user performs an
         // action that requires Drive access rather than in onCreate.
         requestSignIn();
+
+        //checkPathSetSize();
+        //checkPathSetSizeInThread();
+    }
+
+    //todo пробовал запускать поток, который каждые 10 сек проверяет список незагруженных,
+    // и, если список не пустой, загружает файлы по путям, сохраненныз в списке. Но при одновременной
+    // загрузке файлов это часто приводило к дублированию загруженных файлов на облаке
+    // Возможно есть смысл делать список не ЗАГРУЖАЕМЫХ файлов (все), а НЕЗАГРУЖЕННЫХ, т.е. тех, которые не удалось загрузить
+    void checkPathSetSizeInThread() {
+        Thread thread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    while(true) {
+                        sleep(10000);
+
+                        if (pathSet.size() > 0) {
+                            for (String s:pathSet) {
+                                uploadFileByFilePath(new java.io.File(s));
+                            }
+                        }
+
+                        Log.e(TAG, "");
+                        Log.e(TAG, "****************  "+pathSet.size()+"  *****************");
+                        Log.e(TAG, "");
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        thread.start();
+    }
+
+    void checkPathSetSize() {
+        Log.e(TAG, "****************  "+pathSet.size()+"  *****************");
+          if (pathSet.size() > 0) {
+              for (String s:pathSet) {
+                  uploadFileByFilePath(new java.io.File(s));
+              }
+          }
     }
 
     private void getFiles() {
@@ -412,6 +458,8 @@ public class MainActivity extends AppCompatActivity {
     // и, если таких файлов нет ни одного, создается.
     // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
     private void uploadFile(java.io.File localFile, String type, String file_Id) {
+        //todo возможно здесь нужен будет pathSet.add(localFile.getAbsolutePath()), так как метод может быть вызван напрямую, а не через uploadFolderByFileList;
+        pathSet.add(localFile.getAbsolutePath());
         Log.e(TAG, "upload: TRY");
         if (mDriveServiceHelper != null/* && !localFile.getName().equals("null")*/) {
             Log.e(TAG, "Uploading a file.");
@@ -422,12 +470,19 @@ public class MainActivity extends AppCompatActivity {
                     Log.e(TAG, ".....FILE NOT EXISTS!!!");
 
                     mDriveServiceHelper.uploadFile(localFile, type, file_Id)
-                            .addOnSuccessListener(fileId -> Log.e(TAG, "createFile ID = : " + fileId)/*readFile(fileId)*/)
+                            .addOnSuccessListener(fileId -> {
+                                Log.e(TAG, "createFile ID = : " + fileId);
+                                Log.e(TAG, "uploadFile: файл "+localFile.getAbsolutePath()+" успешно загружен, удалить адрес из pathSet");
+                                Log.e(TAG, "uploadFile: pathSet.size() BEFORE = "+pathSet.size());
+                                pathSet.remove(localFile.getAbsolutePath());
+                                Log.e(TAG, "uploadFile: pathSet.size() AFTER = "+pathSet.size());
+                            }/*readFile(fileId)*/)
                             .addOnFailureListener(exception ->
                                     Log.e(TAG, "Couldn't create file.", exception));
 
                 } else {
                     Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+                    pathSet.remove(localFile.getAbsolutePath());
                 }
 
             });
@@ -442,6 +497,7 @@ public class MainActivity extends AppCompatActivity {
     // при успешном создании в эту папку закидываются файлы из списка файлов папки
     // Т.е. каждая папка открывает свой собственный тред для загрузки
     // подпапки загружаются рекурсивно
+    //todo зачем этот метод нужен? Надо работать напрямую с createFolderNew, а этот удалить
     private void uploadFolderNew(java.io.File folder, String mainId) { //
         Log.e(TAG, "upload: TRY");
         String name = folder.getName();
@@ -706,7 +762,12 @@ public class MainActivity extends AppCompatActivity {
     // файлов с одинаковым названием, здесь имя — это НЕ уникальный идентификатор, роль которого выполняет ID) и, если таких файлов нет ни одного, создается.
     // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
     private void createFolderNew(java.io.File folder, String folderId) {
+        pathSet.add(folder.getAbsolutePath());
+        Log.e(TAG, "upload: TRY");
+        Log.e(TAG, "uploadFolder: FOLDER NAME = " + folder.getName());
+        Log.e(TAG, "uploadFolder: FOLDER PATH = " + folder.getAbsolutePath());
         Log.e(TAG, "createFolder: TRY");
+
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Creating a folder.");
 
@@ -727,7 +788,8 @@ public class MainActivity extends AppCompatActivity {
                                         if (!file.isDirectory())
                                             uploadFile(file, MIME_TEXT_FILE, fileId); //если это файл, аплодить его в папку с id новой папки
                                         else
-                                            uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
+                                            createFolderNew(file, fileId);
+                                            ////uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
                                     }
                                 }
 
@@ -752,7 +814,8 @@ public class MainActivity extends AppCompatActivity {
                             if (!file.isDirectory())
                                 uploadFile(file, MIME_TEXT_FILE, id); //если это файл, аплодить его в папку с id новой папки
                             else
-                                uploadFolderNew(file, id);//если это директория, то вызывается весь метод uploadFolder
+                                createFolderNew(file, id);
+                                /////uploadFolderNew(file, id);//если это директория, то вызывается весь метод uploadFolder
                         }
                     }
 
@@ -877,6 +940,7 @@ public class MainActivity extends AppCompatActivity {
         mOpenFileId = fileId;
     }
 
+    HashSet<String> pathSet = new HashSet<>();
 //--------------------------------------------------------------------------------------------------
     //Обертка для uploadFolderByFileList. В uploadFolderByFileList 3 параметра, к тому же этот метод (uploadFolderByFileList) рекурсивный и разделяется на потоки
     //Чтобы было проще с ним работать сделан этот класс только с одним параметром на входе
@@ -890,6 +954,7 @@ public class MainActivity extends AppCompatActivity {
 
     //Добавлена абилити загружать и файлы тоже (изначально только папки)
     void uploadFileByFilePath(java.io.File local_folder) {
+        pathSet.add(local_folder.getAbsolutePath());
         String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath() + "/", "");
 //        if (local_folder.isDirectory()) cuttingPath+="/"; //если файл — это директория, то в конце пути добавляю "/"
         Log.e(TAG, "start");
@@ -964,7 +1029,7 @@ public class MainActivity extends AppCompatActivity {
         }).addOnFailureListener(exception -> {
             Log.e(TAG, "CAN NOT uploadFolderByFileList", exception);
             Log.e(TAG, "CAN NOT upload: " + local_folder + ", cuttingPath = " + cuttingPath + ", id = " + file_Id);
-            tryToUploadLater(local_folder, cuttingPath, file_Id);
+            //todo///временно для проверки/////tryToUploadLater(local_folder, cuttingPath, file_Id);
         });
     }
 
@@ -980,7 +1045,8 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     sleep(10000);
                     Log.e(TAG, "--- try after 10 sec ---------" + local_folder.getName() + "------------");
-                    uploadFolderByFileList(local_folder, cuttingPath, file_Id);
+                    /////uploadFolderByFileList(local_folder, cuttingPath, file_Id);
+                    uploadFileByFilePath(local_folder);//Возможно будет так лучше
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -988,6 +1054,9 @@ public class MainActivity extends AppCompatActivity {
         };
         thread.start();
     }
+
+
+
 
 
 
@@ -1061,6 +1130,7 @@ public class MainActivity extends AppCompatActivity {
         return new RecursiveFileObserverNew(dirPath, (event, file) -> {
             Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
             uploadFileByFilePath(file);
+//            pathSet.add(file.getAbsolutePath());
         });
     }
 

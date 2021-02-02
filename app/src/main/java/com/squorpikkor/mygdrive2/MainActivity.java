@@ -31,8 +31,10 @@ import com.google.firebase.auth.FirebaseUser;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 
 import static android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION;
 
@@ -158,6 +160,8 @@ public class MainActivity extends AppCompatActivity {
 //        findViewById(R.id.create_folder_2).setOnClickListener(view -> mDriveServiceHelper.createFolderInDrive());
         findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
         findViewById(R.id.check_error_download).setOnClickListener(view -> checkPathSetSize());
+        findViewById(R.id.start_queue).setOnClickListener(view -> downloadNextFile());
+        findViewById(R.id.reset_queue).setOnClickListener(view -> downloadQueue = new ArrayList<>());//сброс (обнуление) очереди
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderIdNew(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
 
         // Authenticate the user. For most apps, this should be done when the user performs an
@@ -480,6 +484,7 @@ public class MainActivity extends AppCompatActivity {
                                 Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
                                 errorPathSet.remove(localFile.getAbsolutePath());
                                 Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
+                                downloadNextFile();
                             }/*readFile(fileId)*/)
                             .addOnFailureListener(exception -> {
                                 Log.e(TAG, "Couldn't create file.", exception);
@@ -489,6 +494,7 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
                     errorPathSet.remove(localFile.getAbsolutePath());
+                    downloadNextFile();
                 }
 
             })
@@ -891,6 +897,95 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void createFolderAndStopNew(java.io.File folder, String cuttingPath, String folderId) {
+
+        //todo проверить, походу сохраняется путь без "/" в конце
+        /////updateCash(folder, cuttingPath, folderId);
+
+        Log.e(TAG, "createFolder: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Creating a folder.");
+            mDriveServiceHelper.createFolder(folder.getName(), folderId)
+                .addOnSuccessListener(fileId -> {
+                    Log.e(TAG, "createFolder ID = : " + fileId);
+
+                })
+                .addOnFailureListener(exception -> {
+                    Log.e(TAG, "Couldn't create folder.", exception);
+                    errorPathSet.add(folder.getAbsolutePath());
+                });
+            }
+    }
+
+    //Пусть будет
+    /*private void createFolderAndReturn(java.io.File local_folder, String cuttingPath, String folderId) {
+        final String[] id = new String[1];
+        Log.e(TAG, "createFolder: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Creating a folder.");
+
+            mDriveServiceHelper.createFolder(local_folder.getName(), folderId)
+                    .addOnSuccessListener(fileId -> {
+                        Log.e(TAG, "createFolder ID = : " + fileId);
+                        String new_id =
+
+                        String[] pathArr = cuttingPath.split("/");
+                        Log.e(TAG, "OLD path - " + cuttingPath);
+                        //Если pathArr.length = 3, значит это предпоследний узел: "/папка/файл_1" (или "/папка/папка_1")
+                        // и значит new_id — это id родителя файла "файл_1", и можно сразу аплодить файл по id родителя
+                        // иначе получаем новый new_path и заново вызываем uploadFolderByFileList (уже с дочерним элементом)
+                        if (pathArr.length > 3) {
+                            String newPath = cuttingPath.replace(pathArr[1] + "/", "");// folder_1/folder_2/folder_3 -> folder_2/folder_3.  [1] — потому что 0-ой в /21212/log/ это ""
+                            Log.e(TAG, "NEW path - " + newPath);
+                            Log.e(TAG, ".....Следующий цикл, newPath = "+newPath+" new+id = "+new_id);
+                            uploadFolderByFileList(local_folder, newPath, new_id);
+                        } else {
+                            if (local_folder.isDirectory()) {
+                                Log.e(TAG, ".....Конец цикла, это директория, создаем новую: " + local_folder.getName() + "  id родителя: " + new_id);
+                                createFolder(local_folder.getName(), new_id);
+                            } else {
+                                Log.e(TAG, ".....Конец цикла, это файл, аплодим файл: " + local_folder.getName() + "  id родителя: " + new_id);
+                                uploadFile(local_folder, MIME_TEXT_FILE, new_id);
+                            }
+                        }
+                    })
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "Couldn't create folder.", exception);
+                    });
+        }
+
+    }*/
+
+    private String createFolderAndReturn(String name, String folderId) {
+        final String[] id = new String[1];
+        id[0]="-1";
+        Log.e(TAG, "createFolder: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Creating a folder.");
+
+            mDriveServiceHelper.createFolder(name, folderId)
+                    .addOnSuccessListener(fileId -> {
+                        Log.e(TAG, "createFolder ID = : " + fileId);
+                        id[0] = fileId;
+                    })
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "Couldn't create folder.", exception);
+                    });
+        }
+
+        while (id[0].equals("-1")) {
+            synchronized (this) {
+                try {
+                    Log.e(TAG, ".....wait.....");
+                    wait(1000);
+                } catch (Exception e) {
+                }
+            }
+        }
+
+        return id[0];
+    }
+
     //Пусть будет
     private String createFolder(String name, String folderId) {
         final String[] id = new String[1];
@@ -902,31 +997,44 @@ public class MainActivity extends AppCompatActivity {
                     .addOnSuccessListener(fileId -> {
                         Log.e(TAG, "createFolder ID = : " + fileId);
                         id[0] = fileId;
-                        /*readFile(fileId)*/
+                        downloadNextFile();
                     })
                     .addOnFailureListener(exception -> {
                         Log.e(TAG, "Couldn't create folder.", exception);
-//                        id[0] = "0";
                     });
         }
 
-//        if (!id[0].equals("0") && id[0]!=null)return id[0];
-//        else if (id[0].equals("0"))return null;
-
-
-        /*while (id[0]==null) {
-            Log.e(TAG, ".........try get id.......");
-            synchronized (this) {
-                try {
-                    wait(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        if (id.equals("0"))return null;
-        else */
         return id[0];
+    }
+
+    //Пусть будет
+    /*private void createFolderAndContinue_old_2(java.io.File local_folder, java.io.File file_cut, String cuttingPath, String folderId) {
+        Log.e(TAG, "createFolderAndContinue: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Creating a folder.");
+
+            mDriveServiceHelper.createFolder(file_cut.getName(), folderId)
+                    .addOnSuccessListener(fileId -> {
+                        Log.e(TAG, "createFolder name = "+ file_cut.getName() + "ID = : " + fileId);
+                        doStuff(local_folder, cuttingPath, fileId);
+                    })
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "Couldn't create folder.", exception);
+                    });
+        }
+    }*/
+
+    private void createFolderAndContinue(java.io.File local_folder, java.io.File file, String cuttingPath, String parent_id) {
+        if (mDriveServiceHelper != null) {
+            mDriveServiceHelper.createFolder(file.getName(), parent_id)
+                    .addOnSuccessListener(fileId -> {
+                        Log.e(TAG, "createFolder name - "+ file.getName() + ", parentID - " + parent_id + ", created_folder_id - " + fileId);
+                        doStuffNew(local_folder, cuttingPath, fileId);
+                    })
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "Couldn't create folder.", exception);
+                    });
+        }
     }
 
     /**
@@ -962,18 +1070,109 @@ public class MainActivity extends AppCompatActivity {
     //Добавлена абилити загружать и файлы тоже (изначально только папки)
 
     //todo объединить с uploadFolderByFileList
-    void uploadFileByFilePath(java.io.File local_folder) {
+    void uploadFileByFilePath_old_2(java.io.File local_folder) {
+
+
+
         ///////////////////////pathSet.add(local_folder.getAbsolutePath());
-        String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath() + "/", "");
+        String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath(), "");
 //        if (local_folder.isDirectory()) cuttingPath+="/"; //если файл — это директория, то в конце пути добавляю "/"
-        Log.e(TAG, "start");
+
+        /*Log.e(TAG, "start");
         Log.e(TAG, "beforeCut: " + local_folder.getAbsolutePath());
         Log.e(TAG, "cuttingPath: " + cuttingPath);
-        Log.e(TAG, "-------IS FOLDER = " + local_folder.isDirectory());
-        uploadFolderByFileList(local_folder, cuttingPath, null);
+        Log.e(TAG, "-------IS FOLDER = " + local_folder.isDirectory());*/
+
+        getIdFromCash(local_folder, cuttingPath);
+
+        /////////////////////////////////uploadFolderByFileList(local_folder, cuttingPath, null);
 //        if (local_folder.isDirectory()) uploadFolderByFileList(local_folder, cuttingPath, null);
 //        else uploadFileByFileList(local_folder, cuttingPath, null);
     }
+
+    void uploadFileByFilePath(java.io.File local_folder) {
+        String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath()+"/", "");
+        getIdFromCash(local_folder, cuttingPath);
+    }
+
+    HashMap<String, String> cashMap = new HashMap<>();
+
+
+    void getIdFromCash(java.io.File file, String cuttingPath) {
+        String id = null;
+        /*if (cashMap.containsKey(file.getParent()+"/")) {
+            id = cashMap.get(file.getParent()+"/");
+            Log.e(TAG, "....................................");
+            Log.e(TAG, "..   Есть ID по такому пути! -> "+id);
+            Log.e(TAG, "....................................");
+            cuttingPath = file.getAbsolutePath().replace(file.getParent()+"/", "");
+        }*/
+
+//        Log.e(TAG, "getIdFromCash:   file: " + file.getAbsolutePath());
+//        Log.e(TAG, "getIdFromCash: parent: " + file.getParent());
+
+
+//        if (id == null)
+            uploadFolderByFileList(file, cuttingPath, id);
+//        else
+    }
+
+    void updateCash(java.io.File local_folder, String pathToCash, String file_Id) {
+        //todo для кэша: может быть такое: путь вместе с его id закеширован, но самого файла (папки) уже нет (пользователь удалил)
+        // вставка по id родителя в этом случае не сработает
+        //
+
+//        pathToCash = pathToCash+"/";
+
+        //todo в кэш надо будет записывать и id самого файла, тогда можно проверять наличие файла на диске по сохраненному кэшу
+//        String pathToCash = local_folder.getAbsolutePath().replace(cuttingPath, "");
+        if (!cashMap.containsKey(pathToCash))cashMap.put(pathToCash, file_Id);
+        Log.e(TAG, "                       '");
+        Log.e(TAG, "------ EXPERIMENT ------");
+        Log.e(TAG, "|   fileId = "+file_Id+", pathToCash = "+ pathToCash);
+        int i = 1;
+        for (HashMap.Entry<String, String> entry : cashMap.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            Log.e(TAG, ""+i+") path = "+key+" id = "+value);
+            i++;
+        }
+        Log.e(TAG, "------ EXPERIMENT ------");
+        Log.e(TAG, "                       '");
+    }
+
+    static ArrayList<java.io.File> downloadQueue = new ArrayList<>();
+
+
+    void uploadFolderByFileList(java.io.File local_folder, String cuttingPath, String parent_Id) {
+        Log.e(TAG, "------- cuttingPath = " + cuttingPath);
+        Log.e(TAG, "------- filePath = " + local_folder.getAbsolutePath());
+        String path_for_file = local_folder.getAbsolutePath().replace(cuttingPath, "");
+        Log.e(TAG, "path_for_file: "+path_for_file);
+        java.io.File file_cut = new java.io.File(path_for_file);
+        Log.e(TAG, "file_cut path: " + file_cut.getAbsolutePath());
+
+        mDriveServiceHelper.checkIfExist(file_cut.getName(), parent_Id)
+                .addOnSuccessListener(fileList -> {
+                    Log.e(TAG, "------------------------------------------------------");
+                    Log.e(TAG, "uploadFolderByFileList.checkIfExist: ON SUCCESS: name - " + file_cut.getName() + ", parent_Id - " + parent_Id);
+
+                    //String new_id = null;
+                    if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
+                        //--------------FILE NOT EXISTS ON CLOUD
+                        Log.e(TAG, ".....FILE NOT EXISTS ON CLOUD!!! --- "+file_cut.getName() + ", parent_Id - " + parent_Id);
+                        createFolderAndContinue(local_folder, file_cut, cuttingPath, parent_Id);
+                    } else {
+                        //--------------FILE EXISTS ON CLOUD
+                        Log.e(TAG, ".....FILE EXISTS ON CLOUD!!! --- "+file_cut.getName() + ", parent_Id - " + parent_Id);
+                        String existingFile_id = fileList.getFiles().get(0).getId();
+                        doStuffNew(local_folder, cuttingPath, existingFile_id);
+                    }
+                }).addOnFailureListener(exception -> {
+            errorPathSet.add(local_folder.getAbsolutePath());
+        });
+    }
+
 
     //Работает через обертку uploadFolderByFilePath. Описание см. там
     //На вход в самый первый раз (до рекурсии) метод получает в переменную cuttingPath всегда полный путь МИНУС все что идет до синхронизируемой папки:
@@ -985,15 +1184,119 @@ public class MainActivity extends AppCompatActivity {
     // Другими словами, метод рекурсивно перебирает названия папок на gDrive от синхронизируемой папки до самого последнего чайлда, каждый раз запоминая ID текущей папки
     // И если чайлд оказался последним, то в папке с ID родителя создает файл (если его там ещё не было)
     // Итого: метод загружает файл/папку в папку по ID этой целевой папки, зная только путь локальной папки на телефоне
-    void uploadFolderByFileList(java.io.File local_folder, String cuttingPath, String file_Id) {
+    void uploadFolderByFileList__OLD_2(java.io.File local_folder, String cuttingPath, String file_Id) {
+        Log.e(TAG, "------- cuttingPath = " + cuttingPath);
+        Log.e(TAG, "------- filePath = " + local_folder.getAbsolutePath());
 
+        String path_for_file = local_folder.getAbsolutePath().replace(cuttingPath, "");
+        Log.e(TAG, "path_for_file: "+path_for_file);
+        java.io.File file_cut = new java.io.File(path_for_file);
+        Log.e(TAG, "file_cut path: " + file_cut.getAbsolutePath());
 
-        Log.e(TAG, "                       '");
-        Log.e(TAG, "------ EXPERIMENT ------");
-        Log.e(TAG, "|   fileId = "+file_Id+" newPath = "+ cuttingPath);
-        Log.e(TAG, "------ EXPERIMENT ------");
-        Log.e(TAG, "                       '");
+        ////////////////////updateCash(local_folder, file_cut.getAbsolutePath(), file_Id);
 
+        mDriveServiceHelper.checkIfExist(file_cut.getName(), file_Id)
+                .addOnSuccessListener(fileList -> {
+            Log.e(TAG, "------------------------------------------------------");
+            Log.e(TAG, "uploadFolderByFileList.checkIfExist: ON SUCCESS: name() - " + file_cut.getName() + ", file_Id - " + file_Id);
+            // получаю по имени файла и по ID родителя список файлов (вообще список всегда будет состоять только из одного ЕДИНСТВЕННОГО файла)
+            // если такой файл и беру у этого файла ID
+
+            String new_id = null;
+            if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
+                //--------------FILE NOT EXISTS ON CLOUD
+                Log.e(TAG, ".....FILE NOT EXISTS ON CLOUD!!! --- "+file_cut.getAbsolutePath());
+//                new_id = createFolderAndReturn(local_folder.getName(), file_Id);
+                //createFolder(local_folder.getName(), file_Id);
+                //todo это // createFolderAndContinue_old_2(local_folder, file_cut, cuttingPath, file_Id);
+            } else {
+                //--------------FILE EXISTS ON CLOUD
+                Log.e(TAG, ".....FILE EXISTS ON CLOUD!!! --- "+file_cut.getAbsolutePath());
+                new_id = fileList.getFiles().get(0).getId();
+                //todo это //doStuff(local_folder, cuttingPath, new_id);
+            }/////////////
+
+//                    Log.e(TAG, "..........new_id = "+new_id);
+
+            /*String[] pathArr = cuttingPath.split("/");
+            Log.e(TAG, "OLD path - " + cuttingPath);
+            //Если pathArr.length = 3, значит это предпоследний узел: "/папка/файл_1" (или "/папка/папка_1")
+            // и значит new_id — это id родителя файла "файл_1", и можно сразу аплодить файл по id родителя
+            // иначе получаем новый new_path и заново вызываем uploadFolderByFileList (уже с дочерним элементом)
+                    if (pathArr.length > 3) {
+                        String newPath = cuttingPath.replace(pathArr[1] + "/", "");// folder_1/folder_2/folder_3 -> folder_2/folder_3.  [1] — потому что 0-ой в /21212/log/ это ""
+                        Log.e(TAG, "NEW path - " + newPath);
+                        Log.e(TAG, ".....Следующий цикл, newPath = "+newPath+" new+id = "+new_id);
+                        uploadFolderByFileList(local_folder, newPath, new_id);
+                    } else {
+                        if (local_folder.isDirectory()) {
+                            Log.e(TAG, ".....Конец цикла, это директория, создаем новую: " + local_folder.getName() + "  id родителя: " + new_id);
+                            createFolder(local_folder.getName(), new_id);
+                        } else {
+                            Log.e(TAG, ".....Конец цикла, это файл, аплодим файл: " + local_folder.getName() + "  id родителя: " + new_id);
+                            uploadFile(local_folder, MIME_TEXT_FILE, new_id);
+                        }
+                    }*/
+//            }////////////////
+
+        }).addOnFailureListener(exception -> {
+            Log.e(TAG, "CAN NOT uploadFolderByFileList", exception);
+            Log.e(TAG, "CAN NOT upload: " + local_folder + ", cuttingPath = " + cuttingPath + ", id = " + file_Id);
+            //todo///временно для проверки/////tryToUploadLater(local_folder, cuttingPath, file_Id);
+            errorPathSet.add(local_folder.getAbsolutePath());
+        });
+    }
+
+    void doStuffNew(java.io.File local_folder, String cuttingPath, String new_id) {
+        String[] pathArr = cuttingPath.split("/");
+        for (int i = 0; i < pathArr.length; i++) {
+            Log.e(TAG, "" +i+ ": " + pathArr[i]);
+        }
+        if (local_folder.isDirectory()){
+            Log.e(TAG, "" + local_folder.getAbsolutePath() + " is a directory");
+        } else {
+            Log.e(TAG, "" + local_folder.getAbsolutePath() + " is a file");
+        }
+        if (cuttingPath.equals("")) {
+            Log.e(TAG, ".....Конец цикла");
+            downloadNextFile();
+        } else {
+            Log.e(TAG, "OLD cuttingPath - " + cuttingPath);
+            Log.e(TAG, "pathArr[0] = " + pathArr[0]);
+            String newCuttingPath = "";
+            if (pathArr.length != 1) newCuttingPath = cuttingPath.replace(pathArr[0] + "/", "");
+            Log.e(TAG, "NEW cuttingPath - " + newCuttingPath);
+            Log.e(TAG, ".....След цикл");
+            uploadFolderByFileList(local_folder, newCuttingPath, new_id);
+        }
+    }
+
+    /*void doStuff(java.io.File local_folder, String cuttingPath, String new_id) {
+        String[] pathArr = cuttingPath.split("/");
+        Log.e(TAG, "OLD path - " + cuttingPath);
+        //Если pathArr.length = 3, значит это предпоследний узел: "/папка/файл_1" (или "/папка/папка_1")
+        // и значит new_id — это id родителя файла "файл_1", и можно сразу аплодить файл по id родителя
+        // иначе получаем новый new_path и заново вызываем uploadFolderByFileList (уже с дочерним элементом)
+        if (pathArr.length > 1) {
+            String newPath = cuttingPath.replace(pathArr[1] + "/", "");// folder_1/folder_2/folder_3 -> folder_2/folder_3.  [1] — потому что 0-ой в /21212/log/ это ""
+            Log.e(TAG, "NEW path - " + newPath);
+            Log.e(TAG, ".....Следующий цикл, newPath = "+newPath+" new+id = "+new_id);
+            uploadFolderByFileList(local_folder, newPath, new_id);
+        } else {
+            if (local_folder.isDirectory()) {
+                Log.e(TAG, ".....Конец цикла, это директория, создаем новую: " + local_folder.getName() + "  id родителя: " + new_id);
+                createFolder(local_folder.getName(), new_id);
+            } else {
+                Log.e(TAG, ".....Конец цикла, это файл, аплодим файл: " + local_folder.getName() + "  id родителя: " + new_id);
+                uploadFile(local_folder, MIME_TEXT_FILE, new_id);
+            }
+        }
+    }*/
+
+    void uploadFolderByFileList___OLD(java.io.File local_folder, String cuttingPath, String file_Id) {
+        Log.e(TAG, "------- cuttingPath = " + cuttingPath);
+
+        ///////////////updateCash(local_folder, cuttingPath, file_Id);
 
         String path_for_file = local_folder.getAbsolutePath().replace(cuttingPath, "");
         java.io.File file_cut = new java.io.File(path_for_file);
@@ -1013,7 +1316,7 @@ public class MainActivity extends AppCompatActivity {
                 //Альтернативный вариант без рекуривного аплода подпапок и файлов
 //                createFolderAndStop(file_cut.getName(), file_Id);
                 //Альтернативный вариант без рекуривного аплода подпапок и файлов
-                createFolderAndStop(file_cut, file_Id);
+                createFolderAndStopNew(file_cut, cuttingPath, file_Id);
 
                 //---------------------------------------------
 //                String[] pathArr = cuttingPath.split("/");
@@ -1050,7 +1353,6 @@ public class MainActivity extends AppCompatActivity {
             errorPathSet.add(local_folder.getAbsolutePath());
         });
     }
-
 
     //Если файл/папку не удалось загрузить, то вызывается этот метод
     //Метод создает новый поток для каждого незагруженного файла, ждет 10 сек и пытается загрузить файл снова
@@ -1143,13 +1445,39 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    void downloadNextFile() {
+        if (downloadQueue.size()>0){
+            downloadQueue.remove(0);
+        }
+        if (downloadQueue.size()>0){
+            Log.e(TAG, "....... Загружаем следующий .......");
+            uploadFileByFilePath(downloadQueue.get(0));
+        }
+    }
 
 
     private RecursiveFileObserverNew createFileObserver(final String dirPath) {
         Log.e(TAG, "♦♦♦createFileObserver: START");
         return new RecursiveFileObserverNew(dirPath, (event, file) -> {
             Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
-            uploadFileByFilePath(file);
+
+            /*Thread thread = new Thread() {
+                @Override
+                public void run() {
+                    uploadFileByFilePath(file);
+                }
+            };
+
+            thread.start();*/
+
+            downloadQueue.add(file);
+            Log.e(TAG, "queue count = " + downloadQueue.size());
+
+            if (downloadQueue.size() == 1) {
+                uploadFileByFilePath(downloadQueue.get(0));
+            }
+
+            //////uploadFileByFilePath(file);
         });
     }
 

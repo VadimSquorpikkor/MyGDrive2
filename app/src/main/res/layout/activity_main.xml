@@ -31,6 +31,33 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/start_queue"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:background="#009900"
+            android:layout_height="32dp"
+            android:layout_margin="6dp"
+            android:text="Start Queue" />
+
+        <Button
+            android:id="@+id/reset_queue"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:background="#009900"
+            android:layout_height="32dp"
+            android:layout_margin="6dp"
+            android:text="Reset Queue" />
+
+    </LinearLayout>
+
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 

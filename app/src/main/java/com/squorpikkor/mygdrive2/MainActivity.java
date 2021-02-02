@@ -632,6 +632,9 @@ public class MainActivity extends AppCompatActivity {
             mDriveServiceHelper.createFolder(file.getName(), parent_id)
                     .addOnSuccessListener(fileId -> {
                         Log.e(TAG, "createFolder name - "+ file.getName() + ", parentID - " + parent_id + ", created_folder_id - " + fileId);
+
+                        updateCash(file.getAbsolutePath(), fileId);
+
                         doStuffNew(local_folder, cuttingPath, fileId);
                     })
                     .addOnFailureListener(exception -> {
@@ -664,6 +667,7 @@ public class MainActivity extends AppCompatActivity {
     void uploadFileByFilePath(java.io.File local_folder) {
         String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath()+"/", "");
         getIdFromCash(local_folder, cuttingPath);
+//        uploadFolderByFileList(local_folder, cuttingPath, null);
     }
 
     HashMap<String, String> cashMap = new HashMap<>();
@@ -671,44 +675,43 @@ public class MainActivity extends AppCompatActivity {
 
     void getIdFromCash(java.io.File file, String cuttingPath) {
         String id = null;
-        /*if (cashMap.containsKey(file.getParent()+"/")) {
-            id = cashMap.get(file.getParent()+"/");
+        Log.e(TAG, ".......getIdFromCash: file.getParent() - "+file.getParent());
+            Log.e(TAG, "..cuttingPath before - " + cuttingPath);
+        if (cashMap.containsKey(file.getParent())) {
+            id = cashMap.get(file.getParent());
             Log.e(TAG, "....................................");
             Log.e(TAG, "..   Есть ID по такому пути! -> "+id);
             Log.e(TAG, "....................................");
-            cuttingPath = file.getAbsolutePath().replace(file.getParent()+"/", "");
-        }*/
-
-//        Log.e(TAG, "getIdFromCash:   file: " + file.getAbsolutePath());
-//        Log.e(TAG, "getIdFromCash: parent: " + file.getParent());
-
-
-//        if (id == null)
-            uploadFolderByFileList(file, cuttingPath, id);
-//        else
+            //////cuttingPath = file.getAbsolutePath().replace(""+file.getParent(), "");
+            cuttingPath = "";
+            Log.e(TAG, "..cuttingPath after - " + cuttingPath);
+        }
+        uploadFolderByFileList(file, cuttingPath, id);
     }
 
-    void updateCash(java.io.File local_folder, String pathToCash, String file_Id) {
+    void updateCash(String pathToCash, String file_Id) {
         //todo для кэша: может быть такое: путь вместе с его id закеширован, но самого файла (папки) уже нет (пользователь удалил)
         // вставка по id родителя в этом случае не сработает
         //
 
 //        pathToCash = pathToCash+"/";
 
+        //todo кэш для файла не нужен!!!
+
         //todo в кэш надо будет записывать и id самого файла, тогда можно проверять наличие файла на диске по сохраненному кэшу
 //        String pathToCash = local_folder.getAbsolutePath().replace(cuttingPath, "");
-        if (!cashMap.containsKey(pathToCash))cashMap.put(pathToCash, file_Id);
+        if (!pathToCash.equals("")&&!cashMap.containsKey(pathToCash))cashMap.put(pathToCash, file_Id);
         Log.e(TAG, "                       '");
-        Log.e(TAG, "------ EXPERIMENT ------");
+        Log.e(TAG, "------ КЭШ ------");
         Log.e(TAG, "|   fileId = "+file_Id+", pathToCash = "+ pathToCash);
         int i = 1;
         for (HashMap.Entry<String, String> entry : cashMap.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
-            Log.e(TAG, ""+i+") path = "+key+" id = "+value);
+            Log.e(TAG, ""+i+") path - "+key+" id - "+value);
             i++;
         }
-        Log.e(TAG, "------ EXPERIMENT ------");
+        Log.e(TAG, "------ КЭШ ------");
         Log.e(TAG, "                       '");
     }
 
@@ -717,10 +720,14 @@ public class MainActivity extends AppCompatActivity {
     void uploadFolderByFileList(java.io.File local_folder, String cuttingPath, String parent_Id) {
         Log.e(TAG, "------- cuttingPath = " + cuttingPath);
         Log.e(TAG, "------- filePath = " + local_folder.getAbsolutePath());
+
+
         String path_for_file = local_folder.getAbsolutePath().replace(cuttingPath, "");
         Log.e(TAG, "path_for_file: "+path_for_file);
         java.io.File file_cut = new java.io.File(path_for_file);
         Log.e(TAG, "file_cut path: " + file_cut.getAbsolutePath());
+
+        //updateCash(local_folder, file_cut.getAbsolutePath(), parent_Id);
 
         mDriveServiceHelper.checkIfExist(file_cut.getName(), parent_Id)
                 .addOnSuccessListener(fileList -> {

@@ -14,6 +14,7 @@ import android.os.Environment;
 import android.os.FileObserver;
 import android.util.Log;
 import android.widget.EditText;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -71,13 +72,8 @@ public class MainActivity extends AppCompatActivity {
     //public static final String APP_DIR = Environment.getExternalStorageDirectory() + DIRECTORY;
     java.io.File sMainDir;
 
-    @Override
-    public void onStart() {
-        super.onStart();
-        // Check if user is signed in (non-null) and update UI accordingly.
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        ////updateUI(currentUser);
-    }
+    Switch cashSwitch;
+    Switch deleteSwitch;
 
     void updateUI(String email) {
         ((TextView) findViewById(R.id.account)).setText(email);
@@ -134,11 +130,14 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.query_btn).setOnClickListener(view -> query());
         findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolder(sMainDir.toString()));
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
-        findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeNewFile.txt")));
+        findViewById(R.id.load_folder_by_path).setOnClickListener(view -> startDownLoad(new java.io.File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/Folder/File.txt")));
         findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
         findViewById(R.id.check_error_download).setOnClickListener(view -> checkPathSetSize());
-        findViewById(R.id.start_queue).setOnClickListener(view -> downloadNextFile());
+        findViewById(R.id.start_queue).setOnClickListener(view -> startQueue());
         findViewById(R.id.reset_queue).setOnClickListener(view -> downloadQueue = new ArrayList<>());//сброс (обнуление) очереди
+
+        cashSwitch = findViewById(R.id.do_cash);
+        deleteSwitch = findViewById(R.id.delete_after_download);
         requestSignIn();
     }
 
@@ -200,6 +199,7 @@ public class MainActivity extends AppCompatActivity {
             case REQUEST_CODE_OPEN_DOCUMENT:
                 if (resultCode == Activity.RESULT_OK && resultData != null) {
                     Uri uri = resultData.getData();
+                    Log.e(TAG, "uri - "+uri);
                     if (uri != null) {
                         openFileFromFilePicker(uri);
                     }
@@ -244,6 +244,7 @@ public class MainActivity extends AppCompatActivity {
                                 Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
                                 errorPathSet.remove(localFile.getAbsolutePath());
                                 Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
+                                if (deleteSwitch.isChecked()) deleteFile(localFile);
                                 downloadNextFile();
                             })
                             .addOnFailureListener(exception -> {
@@ -254,6 +255,7 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
                     errorPathSet.remove(localFile.getAbsolutePath());
+                    if (deleteSwitch.isChecked()) deleteFile(localFile);
                     downloadNextFile();
                 }
 
@@ -386,6 +388,7 @@ public class MainActivity extends AppCompatActivity {
                         Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
                         errorPathSet.remove(localFile.getAbsolutePath());
                         Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
+                        if (deleteSwitch.isChecked()) deleteFile(localFile);
                         downloadNextFile();
                     })
                     .addOnFailureListener(exception -> {
@@ -533,9 +536,8 @@ public class MainActivity extends AppCompatActivity {
             }
     }
 
-    //Пусть будет
-    private String createFolder(String name, String folderId) {
-        final String[] id = new String[1];
+    /**Создание папки на облаке по имени и id родителя*/
+    private void createFolder(String name, String folderId) {
         Log.e(TAG, "createFolder: TRY");
         if (mDriveServiceHelper != null) {
             Log.e(TAG, "Creating a folder.");
@@ -543,17 +545,15 @@ public class MainActivity extends AppCompatActivity {
             mDriveServiceHelper.createFolder(name, folderId)
                     .addOnSuccessListener(fileId -> {
                         Log.e(TAG, "createFolder ID = : " + fileId);
-                        id[0] = fileId;
-                        downloadNextFile();
                     })
                     .addOnFailureListener(exception -> {
                         Log.e(TAG, "Couldn't create folder.", exception);
                     });
         }
-
-        return id[0];
     }
 
+    /** После создания папки метод переходит (через doStuffNew) к созданию подпапки.
+    Наличие такой папки, проверка на "файл или папка", проверка, есть ли уже такая папка/файл на облаке происходит в uploadFolderByFileList())*/
     private void createFolderAndContinue(java.io.File local_folder, java.io.File file, String cuttingPath, String parent_id) {
         if (mDriveServiceHelper != null) {
             mDriveServiceHelper.createFolder(file.getName(), parent_id)
@@ -600,7 +600,9 @@ public class MainActivity extends AppCompatActivity {
     //Если кроме создаваемой папки нет на облаке и её родителя, он будет создан
     //Проблема, которую решает этод метод, в том, что на gDrive нет пути, есть только Id родителя, т.е. нельзя просто указать путь, по которому сохранять папку
     void uploadFileByFilePath(java.io.File local_folder) {
-        String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath()+"/", "");
+        String cuttingPath;
+        if (local_folder.getAbsolutePath().contains(sMainDir.getAbsolutePath())) cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath()+"/", "");
+        else cuttingPath = local_folder.getAbsolutePath().replace(Environment.getExternalStorageDirectory()+"/", "");
         getIdFromCash(local_folder, cuttingPath);
 //        uploadFolderByFileList(local_folder, cuttingPath, null); //Загрузка напрямую, без кэширования
     }
@@ -609,7 +611,7 @@ public class MainActivity extends AppCompatActivity {
 
     void getIdFromCash(java.io.File file, String cuttingPath) {
         String id = null;
-        if (cashMap.containsKey(file.getParent())) {
+        if (cashSwitch.isChecked() && cashMap.containsKey(file.getParent())) {
             id = cashMap.get(file.getParent());
             Log.e(TAG, "....................................");
             Log.e(TAG, "..   Есть ID по такому пути! -> "+id);
@@ -686,6 +688,7 @@ public class MainActivity extends AppCompatActivity {
         }
         if (cuttingPath.equals("")) {
             Log.e(TAG, ".....Конец цикла");
+            if (deleteSwitch.isChecked()) deleteFile(local_folder);
             downloadNextFile();
         } else {
             Log.e(TAG, "OLD cuttingPath - " + cuttingPath);
@@ -696,6 +699,17 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, ".....След цикл");
             uploadFolderByFileList(local_folder, newCuttingPath, new_id);
         }
+    }
+
+    /** Метод для удаления файлов после успешного аплода на облако.
+     * Удаляет локальный файл. После удаления проверяет, если родительская папка пустая (т.е. это был последний файл в папке),
+     * то удаляется родительская папка. Если родительская папка родительской папки пуста... Короче — и т.д.*/
+    void deleteFile(java.io.File localFile) {
+        java.io.File parent = localFile.getParentFile();
+        Log.e(TAG, "try to delete file - "+localFile);
+        if (localFile.delete()) Log.e(TAG, "Удалено успешно");
+        else Log.e(TAG, "Удалить не получилось");
+        if (parent!=null && parent.listFiles()!=null && parent.listFiles().length==0)deleteFile(parent);
     }
 
     //Если файл/папку не удалось загрузить, то вызывается этот метод
@@ -764,6 +778,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    void startQueue() {
+        if (downloadQueue.size()>0){
+            Log.e(TAG, "....... Стартуем очередь .......");
+            uploadFileByFilePath(downloadQueue.get(0));
+        }
+    }
 
     private RecursiveFileObserverNew createFileObserver(final String dirPath) {
         Log.e(TAG, "♦♦♦createFileObserver: START");
@@ -774,6 +794,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void startDownLoad(java.io.File file) {
+        Log.e(TAG, "***************************startDownLoad: "+ file.getAbsolutePath());
         downloadQueue.add(file);
         Log.e(TAG, "queue count = " + downloadQueue.size());
 

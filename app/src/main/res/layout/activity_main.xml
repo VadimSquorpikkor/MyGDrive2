@@ -50,7 +50,6 @@
             android:layout_height="32dp"
             android:layout_margin="6dp"
             android:text="Reset Queue" />
-
     </LinearLayout>
 
 
@@ -62,7 +61,7 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/get_folder_id"
+            android:id="@+id/load_folder_by_path"
             android:layout_width="match_parent"
             android:layout_weight="1"
             android:background="#dddd00"
@@ -141,6 +140,33 @@
             android:layout_weight="1"
             android:background="#aa0000"
             android:text="Upload Folder" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Switch
+            android:id="@+id/do_cash"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Кэшировать"
+            android:checked="true"
+            android:textSize="12sp"
+            android:gravity="center"/>
+
+        <Switch
+            android:id="@+id/delete_after_download"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:checked="false"
+            android:gravity="center"
+            android:text="Удалить после загрузки"
+            android:textSize="12sp" />
 
     </LinearLayout>
 

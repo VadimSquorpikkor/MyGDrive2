@@ -155,7 +155,7 @@ class Backup extends AppCompatActivity {
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderId(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeFolder2")));
-        findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeNewFile.txt")));
+        findViewById(R.id.load_folder_by_path).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/Folder/File.txt")));
 //        findViewById(R.id.create_folder_2).setOnClickListener(view -> mDriveServiceHelper.createFolderInDrive());
         findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
         findViewById(R.id.check_error_download).setOnClickListener(view -> checkPathSetSize());

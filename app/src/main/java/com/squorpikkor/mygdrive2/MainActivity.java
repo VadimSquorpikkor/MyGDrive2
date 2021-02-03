@@ -132,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.create_btn).setOnClickListener(view -> createFile());
         findViewById(R.id.save_btn).setOnClickListener(view -> saveFile());
         findViewById(R.id.query_btn).setOnClickListener(view -> query());
-        findViewById(R.id.upload_btn).setOnClickListener(view -> createFolderNew(new java.io.File(sMainDir.toString()), null));
+        findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolder(sMainDir.toString()));
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
         findViewById(R.id.get_folder_id).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(sMainDir.toString() + "/SomeNewFolder/SomeNewFile.txt")));
         findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
@@ -155,12 +155,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void getFiles() {
-//        String name = "nuclib.txt";
         String name = "com.atomtex.ascanner";
-//        String id = "1ZDzWN2qNy_osWVMmh0y49ukDUtkS84aG";
-//        String id = "17IqLtwR-9XK8EcMEtMhn_jTlYFw6YQqb";
-//        String id = "1PDWSeibe-xhFOkSaCE4wSN5xXZKMc-vL";//20201208_153017
-        String id = "14W2pd6V3N2NWTcjhxl5LYpyve3L24HkE";//com.atomtex.ascanner
         mDriveServiceHelper.checkIfExist(name, null).addOnSuccessListener(fileList -> {
             Log.e(TAG, "createFolderNew: fileList - " + fileList);
             Log.e(TAG, "createFolderNew: fileList size - " + fileList.getFiles().size());
@@ -214,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
                 if (resultCode == Activity.RESULT_OK && resultData != null) {
                     Uri uri = resultData.getData();
                     if (uri != null) {
-                        uploadFile(new java.io.File(Environment.getExternalStorageDirectory(), "nuclib.txt"), MIME_TEXT_FILE, null);
+                        checkAndUploadFile(new java.io.File(Environment.getExternalStorageDirectory(), "nuclib.txt"), MIME_TEXT_FILE, null);
 //                        uploadFile(new java.io.File(uri.getPath()));
                     }
                 }
@@ -229,6 +224,43 @@ public class MainActivity extends AppCompatActivity {
                 }
         }
         super.onActivityResult(requestCode, resultCode, resultData);
+    }
+
+    //Перед аплодом проверяет файл на существовании на облаке. При аплоде по событию обсервера используется UploadFile без проверки, так как проверка уже есть в методе uploadFolderByFileList
+    private void checkAndUploadFile(java.io.File localFile, String type, String file_Id) {
+        Log.e(TAG, "upload: TRY");
+        if (mDriveServiceHelper != null) {
+            Log.e(TAG, "Uploading a file.");
+
+            mDriveServiceHelper.checkIfExist(localFile.getName(), file_Id).addOnSuccessListener(fileList -> {
+
+                if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
+                    Log.e(TAG, ".....FILE NOT EXISTS!!!");
+
+                    mDriveServiceHelper.uploadFile(localFile, type, file_Id)
+                            .addOnSuccessListener(fileId -> {
+                                Log.e(TAG, "createFile ID = : " + fileId);
+                                Log.e(TAG, "uploadFile: файл "+localFile.getAbsolutePath()+" успешно загружен, удалить адрес из pathSet");
+                                Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
+                                errorPathSet.remove(localFile.getAbsolutePath());
+                                Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
+                                downloadNextFile();
+                            })
+                            .addOnFailureListener(exception -> {
+                                Log.e(TAG, "Couldn't create file.", exception);
+                                errorPathSet.add(localFile.getAbsolutePath());
+                            });
+
+                } else {
+                    Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+                    errorPathSet.remove(localFile.getAbsolutePath());
+                    downloadNextFile();
+                }
+
+            })
+                    .addOnFailureListener(exception ->
+                            errorPathSet.add(localFile.getAbsolutePath()));
+        }
     }
 
     /**
@@ -345,55 +377,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
-
-    //альтернативная версия 2
-    //Перед созданием файла проверяется (checkIfExist), если такой файл уже существует, то создаваться не будет.
-    // При этом проверяется не весь список имен, а только список имен у родителя, потому как файл с таким именем может быть где-то
-    // в другом месте (если бы проверялось по списку всех имен, файл не был бы создан, хоть в текущей директории такого файла и нет)
-    //Метод uploadFile получает через метод checkIfExist список всех файлов с именем localFile.getName() при этом все эти файлы только для родителя с id = file_Id
-    // Т.е. перед тем как создать файл "New" в папке "Folder" получаю список всех файлов с именем "New", находящихся в этой папке (на gDrive может в одной директории находиться несколько
-    // файлов с одинаковым названием, здесь имя — это НЕ уникальный идентификатор, роль которого выполняет ID)
-    // и, если таких файлов нет ни одного, создается.
-    // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
     private void uploadFile(java.io.File localFile, String type, String file_Id) {
-        /////////////////////////pathSet.add(localFile.getAbsolutePath());
-        Log.e(TAG, "upload: TRY");
-        if (mDriveServiceHelper != null/* && !localFile.getName().equals("null")*/) {
-            Log.e(TAG, "Uploading a file.");
-
-            mDriveServiceHelper.checkIfExist(localFile.getName(), file_Id).addOnSuccessListener(fileList -> {
-
-                if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
-                    Log.e(TAG, ".....FILE NOT EXISTS!!!");
-
-                    mDriveServiceHelper.uploadFile(localFile, type, file_Id)
-                            .addOnSuccessListener(fileId -> {
-                                Log.e(TAG, "createFile ID = : " + fileId);
-                                Log.e(TAG, "uploadFile: файл "+localFile.getAbsolutePath()+" успешно загружен, удалить адрес из pathSet");
-                                Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
-                                errorPathSet.remove(localFile.getAbsolutePath());
-                                Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
-                                downloadNextFile();
-                            }/*readFile(fileId)*/)
-                            .addOnFailureListener(exception -> {
-                                Log.e(TAG, "Couldn't create file.", exception);
-                                errorPathSet.add(localFile.getAbsolutePath());
-                            });
-
-                } else {
-                    Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
-                    errorPathSet.remove(localFile.getAbsolutePath());
-                    downloadNextFile();
+        if (mDriveServiceHelper != null) {
+            mDriveServiceHelper.uploadFile(localFile, type, file_Id)
+                    .addOnSuccessListener(fileId -> {
+                        Log.e(TAG, "createFile ID = : " + fileId);
+                        Log.e(TAG, "uploadFile: файл "+localFile.getAbsolutePath()+" успешно загружен, удалить адрес из pathSet");
+                        Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
+                        errorPathSet.remove(localFile.getAbsolutePath());
+                        Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
+                        downloadNextFile();
+                    })
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "Couldn't create file.", exception);
+                        errorPathSet.add(localFile.getAbsolutePath());
+                    });
                 }
-
-            })
-                    .addOnFailureListener(exception ->
-                            errorPathSet.add(localFile.getAbsolutePath()));
-        }
     }
-
-
 
     /**
      * Saves the currently opened file created via {@link #createFile()} if one exists.
@@ -496,95 +496,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    //По-сути этот метод не создает новую папку, а загружает папку
-    //На вход получает ФАЙЛ и загружает его
-    //Чтобы создать папку нужен будет другой метод, который на вход будет принимать ИМЯ и ID родителя
-    //TODO есть смысл переименовать этот метод в uploadFolderNew, чтобы не было путаницы
-
-    // squorpikkor
-    // Метод работает в связке с uploadFolderNew
-    // Загружается папка вместе с подпапками и файлами в ней
-    // Вся загрузка идет в отдельном треде: если среди загружаемых файлов попадается папка,
-    // то создается папка с именем загружаемой папки, создание папки происходит в отдельном треде
-    // при успешном создании в эту папку закидываются файлы из списка файлов папки
-    // Т.е. каждая папка открывает свой собственный тред для загрузки
-    // подпапки загружаются рекурсивно
-
-    //Перед созданием папки проверяется (checkIfExist), если такая папка уже существует, то создаваться не будет.
-    // Если существует, продолжается проверка подпапки и т.д.
-    // При этом проверяется не весь список имен, а только список имен у родителя, потому как папка с таким именем может быть где-то
-    // в другом месте (если бы проверялось по списку всех имен, папка не была бы создана, хоть в текущей директории такой папки и нет)
-    //Метод createFolderNew рекурсивно получает через метод checkIfExist список всех файлов с именем folder.getName() при этом все эти файлы только для родителя с id = folderId
-    // Т.е. перед тем как создать папку "New" в папке "Folder" получаю список всех файлов с именем "New", находящихся в этой папке (на gDrive может в одной директории находиться несколько
-    // файлов с одинаковым названием, здесь имя — это НЕ уникальный идентификатор, роль которого выполняет ID) и, если таких файлов нет ни одного, создается.
-    // Если на checkIfExist в качестве id подать null, то проверятся будет список файлов в корне
-    private void createFolderNew(java.io.File folder, String folderId) {
-        //////////////////////////pathSet.add(folder.getAbsolutePath());
-        Log.e(TAG, "upload: TRY");
-        Log.e(TAG, "uploadFolder: FOLDER NAME = " + folder.getName());
-        Log.e(TAG, "uploadFolder: FOLDER PATH = " + folder.getAbsolutePath());
-        Log.e(TAG, "createFolder: TRY");
-
-        if (mDriveServiceHelper != null) {
-            Log.e(TAG, "Creating a folder.");
-
-            mDriveServiceHelper.checkIfExist(folder.getName(), folderId).addOnSuccessListener(fileList -> {
-
-                if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
-                    Log.e(TAG, ".....FILE NOT EXISTS!!!");
-
-                    mDriveServiceHelper.createFolder(folder.getName(), folderId)
-                            .addOnSuccessListener(fileId -> {
-                                Log.e(TAG, "createFolder ID = : " + fileId);
-
-                                if (folder.listFiles() != null) {
-
-                                    for (java.io.File file : folder.listFiles()) {
-                                        file.getName();
-                                        Log.e(TAG, "........... id = " + fileId);
-                                        if (!file.isDirectory())
-                                            uploadFile(file, MIME_TEXT_FILE, fileId); //если это файл, аплодить его в папку с id новой папки
-                                        else
-                                            createFolderNew(file, fileId);
-                                            ////uploadFolderNew(file, fileId);//если это директория, то вызывается весь метод uploadFolder
-                                    }
-                                }
-
-                            })
-                            .addOnFailureListener(exception ->
-                                    errorPathSet.add(folder.getAbsolutePath()));
-
-
-                } else {
-                    Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
-
-                    //Если папка существует, берем её ID и перебираем её файлы и (если есть) подпапки
-
-                    String id = fileList.getFiles().get(0).getId();
-
-                    if (folder.listFiles() != null) {
-
-                        for (java.io.File file : folder.listFiles()) {
-                            file.getName();
-                            Log.e(TAG, "........... id = " + id);
-                            if (!file.isDirectory())
-                                uploadFile(file, MIME_TEXT_FILE, id); //если это файл, аплодить его в папку с id новой папки
-                            else
-                                createFolderNew(file, id);
-                                /////uploadFolderNew(file, id);//если это директория, то вызывается весь метод uploadFolder
-                        }
-                    }
-
-                }
-
-
-            });
-
+    //По пути папки получает список всех файлов в папке и каждый файл добавляет в очередь (автоматом стартует закачка)
+    //Если в папке попадается подпапка, то рекурсивно вызывается uploadFolder и перебирает все файлы уже в подпапке и т.д.
+    //По сути: метод на вход получает путь к локальной папке и загружает ВСЕ файлы, включая поддиректории
+    //При этом на GDrive полностью сохраняется структура директорий, как она была в локальной папке
+    private void uploadFolder(String path) {
+        java.io.File folder = new java.io.File(path);
+        java.io.File[] files = folder.listFiles();
+        for (java.io.File file:files) {
+            if (file.isFile()) {
+                startDownLoad(file);
+            } else {
+                uploadFolder(file.getAbsolutePath());
+            }
         }
 
     }
-
-
 
     private void createFolderAndStopNew(java.io.File folder, String cuttingPath, String folderId) {
 
@@ -664,27 +591,30 @@ public class MainActivity extends AppCompatActivity {
     HashSet<String> errorPathSet = new HashSet<>();
 
 
+    //Обертка для uploadFolderByFileList.
+    //Чтобы было проще с ним работать сделан этот класс только с одним параметром на входе
+    //В итоге получается метод, который на вход получает локальную папку, которая загружается на GDrive в
+    //СООТВЕТСТВУЮЩУЮ папку, как она находится относительно главной папки (с которой идет синхронизация)
+    //Т.е.: папка storage/emulated/0/com.atomtex.ascanner/folder_1/folder_2/folder_3/ будет загружена в MyDrive>com.atomtex.ascanner>folder_1>folder_2
+    //Если папка уже есть, то она загружаться не будет, но находящиеся в ней фалы будут загружены (если их не было)
+    //Если кроме создаваемой папки нет на облаке и её родителя, он будет создан
+    //Проблема, которую решает этод метод, в том, что на gDrive нет пути, есть только Id родителя, т.е. нельзя просто указать путь, по которому сохранять папку
     void uploadFileByFilePath(java.io.File local_folder) {
         String cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath()+"/", "");
         getIdFromCash(local_folder, cuttingPath);
-//        uploadFolderByFileList(local_folder, cuttingPath, null);
+//        uploadFolderByFileList(local_folder, cuttingPath, null); //Загрузка напрямую, без кэширования
     }
 
     HashMap<String, String> cashMap = new HashMap<>();
 
-
     void getIdFromCash(java.io.File file, String cuttingPath) {
         String id = null;
-        Log.e(TAG, ".......getIdFromCash: file.getParent() - "+file.getParent());
-            Log.e(TAG, "..cuttingPath before - " + cuttingPath);
         if (cashMap.containsKey(file.getParent())) {
             id = cashMap.get(file.getParent());
             Log.e(TAG, "....................................");
             Log.e(TAG, "..   Есть ID по такому пути! -> "+id);
             Log.e(TAG, "....................................");
-            //////cuttingPath = file.getAbsolutePath().replace(""+file.getParent(), "");
             cuttingPath = "";
-            Log.e(TAG, "..cuttingPath after - " + cuttingPath);
         }
         uploadFolderByFileList(file, cuttingPath, id);
     }
@@ -692,14 +622,11 @@ public class MainActivity extends AppCompatActivity {
     void updateCash(String pathToCash, String file_Id) {
         //todo для кэша: может быть такое: путь вместе с его id закеширован, но самого файла (папки) уже нет (пользователь удалил)
         // вставка по id родителя в этом случае не сработает
-        //
-
-//        pathToCash = pathToCash+"/";
 
         //todo кэш для файла не нужен!!!
 
         //todo в кэш надо будет записывать и id самого файла, тогда можно проверять наличие файла на диске по сохраненному кэшу
-//        String pathToCash = local_folder.getAbsolutePath().replace(cuttingPath, "");
+
         if (!pathToCash.equals("")&&!cashMap.containsKey(pathToCash))cashMap.put(pathToCash, file_Id);
         Log.e(TAG, "                       '");
         Log.e(TAG, "------ КЭШ ------");
@@ -721,20 +648,16 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "------- cuttingPath = " + cuttingPath);
         Log.e(TAG, "------- filePath = " + local_folder.getAbsolutePath());
 
-
         String path_for_file = local_folder.getAbsolutePath().replace(cuttingPath, "");
         Log.e(TAG, "path_for_file: "+path_for_file);
         java.io.File file_cut = new java.io.File(path_for_file);
         Log.e(TAG, "file_cut path: " + file_cut.getAbsolutePath());
-
-        //updateCash(local_folder, file_cut.getAbsolutePath(), parent_Id);
 
         mDriveServiceHelper.checkIfExist(file_cut.getName(), parent_Id)
                 .addOnSuccessListener(fileList -> {
                     Log.e(TAG, "------------------------------------------------------");
                     Log.e(TAG, "uploadFolderByFileList.checkIfExist: ON SUCCESS: name - " + file_cut.getName() + ", parent_Id - " + parent_Id);
 
-                    //String new_id = null;
                     if (fileList.getFiles() != null && fileList.getFiles().size() == 0) {
                         //--------------FILE NOT EXISTS ON CLOUD
                         Log.e(TAG, ".....FILE NOT EXISTS ON CLOUD!!! --- "+file_cut.getName() + ", parent_Id - " + parent_Id);
@@ -846,25 +769,17 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "♦♦♦createFileObserver: START");
         return new RecursiveFileObserverNew(dirPath, (event, file) -> {
             Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
-
-            /*Thread thread = new Thread() {
-                @Override
-                public void run() {
-                    uploadFileByFilePath(file);
-                }
-            };
-
-            thread.start();*/
-
-            downloadQueue.add(file);
-            Log.e(TAG, "queue count = " + downloadQueue.size());
-
-            if (downloadQueue.size() == 1) {
-                uploadFileByFilePath(downloadQueue.get(0));
-            }
-
-            //////uploadFileByFilePath(file);
+            startDownLoad(file);
         });
+    }
+
+    void startDownLoad(java.io.File file) {
+        downloadQueue.add(file);
+        Log.e(TAG, "queue count = " + downloadQueue.size());
+
+        if (downloadQueue.size() == 1) {
+            uploadFileByFilePath(downloadQueue.get(0));
+        }
     }
 
 }

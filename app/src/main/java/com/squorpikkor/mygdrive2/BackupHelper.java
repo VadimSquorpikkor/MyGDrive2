@@ -17,6 +17,7 @@ import com.google.api.client.http.FileContent;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,15 +29,11 @@ import java.util.concurrent.Executors;
 
 import static com.squorpikkor.mygdrive2.MainActivity.TAG;
 
-/**
- * A utility for performing read/write operations on Drive files via the REST API and opening a
- * file picker UI via Storage Access Framework.
- */
-public class DriveServiceHelper {
+class BackupHelper {
     private final Executor mExecutor = Executors.newSingleThreadExecutor();
     private final Drive mDriveService;
 
-    public DriveServiceHelper(Drive driveService) {
+    public BackupHelper(Drive driveService) {
         mDriveService = driveService;
     }
 
@@ -48,6 +45,16 @@ public class DriveServiceHelper {
         String fileId;
         if (id == null) fileId = "root";
         else fileId = id;
+
+//        Tasks tasks;
+
+        /*checkIfExist(name).addOnSuccessListener(fileList -> {
+            if (fileList != null && fileList.getFiles() != null && fileList.getFiles().size() != 0) {
+                Log.e(TAG, ".....FILE NOT EXISTS!!!");
+            } else Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
+
+        });*/
+
 
         return Tasks.call(mExecutor, () -> {
             File metadata = new File()
@@ -62,6 +69,7 @@ public class DriveServiceHelper {
 
             return googleFile.getId();
         });
+
 
     }
 
@@ -84,9 +92,26 @@ public class DriveServiceHelper {
         });
     }
 
+    //альтернативная версия
+    public Task<String> uploadFile(final java.io.File localFile, String type) {
+        return Tasks.call(mExecutor, () -> {
+            // Retrieve the metadata as a File object.
+            File fileMetadata = new File();
+            fileMetadata.setName(localFile.getName());
+            java.io.File filePath = new java.io.File(localFile.getAbsolutePath());
+            FileContent mediaContent = new FileContent(type, filePath);
+            File file = mDriveService.files().create(fileMetadata, mediaContent)
+                    .setFields("id")
+                    .execute();
+            System.out.println("File ID: " + file.getId());
+
+            return file.getId();
+        });
+    }
+
     // TO UPLOAD A FILE ONTO DRIVE
     public Task<String> uploadFile(final java.io.File localFile,
-                                 final String mimeType, @Nullable final String folderId) {
+                                   final String mimeType, @Nullable final String folderId) {
         Log.e(TAG, "uploadFile: " + folderId);
         return Tasks.call(mExecutor, () -> {
             // Retrieve the metadata as a File object.
@@ -183,6 +208,15 @@ public class DriveServiceHelper {
         return Tasks.call(mExecutor, () -> mDriveService.files().list().setFields("files(id, name, parents, mimeType, trashed)").execute()); //я изменил, теперь можно получать инфу: id, имя, id родителя, mime тип, удален ли файл
     }
 
+    public Task<FileList> checkIfExist(String name) {
+        Log.e(TAG, "checkIfExist");
+//        return Tasks.call(mExecutor, () -> mDriveService.files().list().setFields("files(id, name, parents, mimeType) and trashed=false and name='"+name+"'").execute());
+        return Tasks.call(mExecutor, () -> mDriveService.files().list()
+                .setFields("files(id, name, parents, mimeType, trashed)")
+                .setQ("trashed=false and name='"+name+"'")
+                .execute());
+    }
+
     public Task<FileList> checkIfExist(String name, String parentId) {
         //если parentId == null, то выбираем файлы в корне (id = "root")
         Log.e(TAG, "checkIfExist");
@@ -240,6 +274,67 @@ public class DriveServiceHelper {
 
             return Pair.create(name, content);
         });
+    }
+
+//--------------------------------------------------------------------------------------------------
+
+    public void createFolderInDrive() {
+        boolean existed = checkExistedFolder("MyFolder");
+
+        if (!existed) {
+            File fileMetadata = new File();
+            fileMetadata.setName("MyFolder");
+            fileMetadata.setMimeType("application/vnd.google-apps.folder");
+
+            File file = null;
+            try {
+                file = mDriveService.files().create(fileMetadata)
+                        .setFields("id")
+                        .execute();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.out.println("Folder ID: " + file.getId());
+
+            Log.e(this.toString(), "Folder Created with ID:" + file.getId());
+
+
+
+//            Toast.LENGTH_SHORT).show();
+        } else {
+            Log.e(TAG, "Folder is existed already");
+        }
+
+
+    }
+
+    private boolean checkExistedFolder(String folderName) {
+        //File file = null;
+        boolean existedFolder = true;
+        // check if the folder exists already
+        try {
+            //String query = "mimeType='application/vnd.google-apps.folder' and trashed=false and title='" + "Evacuation Kit" + "'";
+            String query = "mimeType='application/vnd.google-apps.folder' and trashed=false and name='" + folderName + "'";
+            // add parent param to the query if needed
+            //if (parentId != null) {
+            //query = query + " and '" + parentId + "' in parents";
+            // }
+
+            Drive.Files.List request = mDriveService.files().list().setQ(query);
+            FileList fileList = request.execute();
+
+            if (fileList.getFiles().size() == 0) {
+                // file = fileList.getFiles().get(0);
+                existedFolder = false;
+
+            }
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+
+        }
+        return existedFolder;
     }
 
 }

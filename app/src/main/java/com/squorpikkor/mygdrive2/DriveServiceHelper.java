@@ -27,6 +27,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import static com.squorpikkor.mygdrive2.MainActivity.TAG;
+import static com.squorpikkor.mygdrive2.MainActivity.uploadIsAllowed;
 
 /**
  * A utility for performing read/write operations on Drive files via the REST API and opening a
@@ -195,7 +196,8 @@ public class DriveServiceHelper {
         //если parentId == null, то выбираем файлы в корне (id = "root")
         Log.e(TAG, "checkIfExist");
         String q = "trashed=false and name='"+name+"' and '"+parentId+"' in parents";
-        if (parentId == null) q = "trashed=false and name='"+name+"' and 'root' in parents";
+        if (!uploadIsAllowed)Log.e(TAG, "----- Загрузка запрещена!!! -----");
+        if (parentId == null && uploadIsAllowed) q = "trashed=false and name='"+name+"' and 'root' in parents";
 
 //        return Tasks.call(mExecutor, () -> mDriveService.files().list().setQ("trashed=false and name='"+name+"' and '"+parentId+"' in parents").setFields("files(id, name, parents, mimeType, trashed)").execute());
         String finalQ = q;

@@ -81,10 +81,9 @@ public class MainActivity extends AppCompatActivity {
 
     Switch cashSwitch;
     Switch deleteSwitch;
+    Switch WiFiOnlySwitch;
 
-    boolean uploadAllowed; //разрешена загрузка. Устанавливать только в NetworkReceiver!
-
-    boolean onlyWiFiUpload;//загружать только по WiFi(true) или по любой сети(false)
+    static public boolean uploadIsAllowed;
 
 
     // Whether there is a Wi-Fi connection.
@@ -164,6 +163,12 @@ public class MainActivity extends AppCompatActivity {
 
         cashSwitch = findViewById(R.id.do_cash);
         deleteSwitch = findViewById(R.id.delete_after_upload);
+        WiFiOnlySwitch = findViewById(R.id.wifi_only);
+
+        WiFiOnlySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            canIUpload();
+        });
+
         requestSignIn();
         restoreErrorPathSetFromFile();
 
@@ -186,23 +191,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Refreshes the display if the network connection and the
-    // pref settings allow it.
-
-    @Override
-    public void onStart () {
-        super.onStart();
-
-        // Gets the user's network preference settings
-        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
-
-        // Retrieves a string value for the preferences. The second parameter
-        // is the default value to use if a preference value is not found.
-        sPref = sharedPrefs.getString("listPref", "Wi-Fi");
-
-        updateConnectedFlags();
-    }
-
     //todo это оставил только чтобы сохранить условие в IF, остальное не нужно. Нужно будет при
     // проверке: разрешена ли загрузка только по WiFi или по любой
     public void loadPage() {
@@ -215,24 +203,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
-    // Checks the network connection and sets the wifiConnected and mobileConnected
-    // variables accordingly.
-    public void updateConnectedFlags() {
-        ConnectivityManager connMgr = (ConnectivityManager)
-                getSystemService(Context.CONNECTIVITY_SERVICE);
-
-        NetworkInfo activeInfo = connMgr.getActiveNetworkInfo();
-        if (activeInfo != null && activeInfo.isConnected()) {
-            wifiConnected = activeInfo.getType() == ConnectivityManager.TYPE_WIFI;
-            mobileConnected = activeInfo.getType() == ConnectivityManager.TYPE_MOBILE;
-        } else {
-            wifiConnected = false;
-            mobileConnected = false;
-        }
-    }
-
-
+    //todo эксперимент
     void checkConnection() {
         ConnectivityManager connMgr =
                 (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -252,13 +223,13 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "Mobile connected: " + isMobileConn);
     }
 
+    //todo эксперимент
     public boolean isOnline() {
         ConnectivityManager connMgr = (ConnectivityManager)
                 getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
         return (networkInfo != null && networkInfo.isConnected());
     }
-
 
     private void getFiles() {
         String name = "com.atomtex.ascanner";
@@ -916,6 +887,15 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    //todo Вообще не нужно два массива для путей файлов (очередь и список_незагруженных) можно
+    // использовать только один (очередь), просто при неудачной попытке загрузки путь не удаляется
+    // из очереди, а uploadNextFile() пытается загрузить след., пока не дойдет до конца массива
+    // так всегда будет список ещё_не_загруженных_файлов. Если приложение будет закрыто в момент
+    // загрузки файлов, очередь будет сохранена в Pref, в случае использования списка_незагруженных
+    // этот список просто не будет ещё создан (ведь не было ошибок во время загрузки) и при
+    // перезапуске приложения эти файлы не будут загружены на облако
+    // Тогда uploadQueue должна будет хранить String
+
     void startUpload(java.io.File file) {
         Log.e(TAG, "***************************startUpLoad: "+ file.getAbsolutePath() + " ***************************");
         uploadQueue.add(file);
@@ -926,6 +906,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**Вызывается при ошибке загрузки*/
     public void iCantUpload(String file_path) {
         Log.e(TAG, "....... uploadError .......");
         uploadNextFile();
@@ -939,7 +920,6 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, ".......................................................");
     }
 
-    //todo javax.net.ssl.SSLException при обрыве соединения во время аплода
     private void uploadFromErrorList() {
         for (String path:errorPathSet) {
             startUpload(new java.io.File(path));
@@ -973,15 +953,14 @@ public class MainActivity extends AppCompatActivity {
         return set;
     }
 
+    void canIUpload() {
+        uploadIsAllowed = ((!WiFiOnlySwitch.isChecked()) && (wifiConnected || mobileConnected))
+                || (((WiFiOnlySwitch.isChecked()) && (wifiConnected)));
+        if (mDriveServiceHelper!=null)uploadFromErrorList();
+    }
 
 
     public class NetworkReceiver extends BroadcastReceiver {
-
-        private boolean uploadIsAllowed;
-
-        public boolean isUploadAllowed() {
-            return uploadIsAllowed;
-        }
 
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -989,33 +968,22 @@ public class MainActivity extends AppCompatActivity {
                     context.getSystemService(Context.CONNECTIVITY_SERVICE);
             NetworkInfo networkInfo = conn.getActiveNetworkInfo();
 
-            // Checks the user prefs and the network connection. Based on the result, decides whether
-            // to refresh the display or keep the current display.
-            // If the userpref is Wi-Fi only, checks to see if the device has a Wi-Fi connection.
-            if (WIFI.equals(sPref) && networkInfo != null
-                    && networkInfo.getType() == ConnectivityManager.TYPE_WIFI) {
-                // If device has its Wi-Fi connection, sets refreshDisplay
-                // to true. This causes the display to be refreshed when the user
-                // returns to the app.
-
-                uploadIsAllowed = true;
+            if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI) {
+                wifiConnected = true;
                 Log.e(TAG, "wifi_connected");
-
-                // If the setting is ANY network and there is a network connection
-                // (which by process of elimination would be mobile), sets refreshDisplay to true.
-            } else if (ANY.equals(sPref) && networkInfo != null) {
-                uploadIsAllowed = true;
-                Log.e(TAG, "Any connected");
-
-                // Otherwise, the app can't download content--either because there is no network
-                // connection (mobile or Wi-Fi), or because the pref setting is WIFI, and there
-                // is no Wi-Fi connection.
-                // Sets refreshDisplay to false.
+            } else if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_MOBILE) {
+                Log.e(TAG, "gsm connected");
+                mobileConnected = true;
             } else {
-                uploadIsAllowed = true;
+                wifiConnected = false;
+                mobileConnected = false;
                 Log.e(TAG, "lost_connection");
             }
+            canIUpload();
+
         }
+
+
     }
 
 

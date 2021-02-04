@@ -5,9 +5,15 @@ import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -76,6 +82,25 @@ public class MainActivity extends AppCompatActivity {
     Switch cashSwitch;
     Switch deleteSwitch;
 
+    boolean uploadAllowed; //разрешена загрузка. Устанавливать только в NetworkReceiver!
+
+    boolean onlyWiFiUpload;//загружать только по WiFi(true) или по любой сети(false)
+
+
+    // Whether there is a Wi-Fi connection.
+    private static boolean wifiConnected = false;
+    // Whether there is a mobile connection.
+    private static boolean mobileConnected = false;
+    // Whether the display should be refreshed.
+    public static boolean refreshDisplay = true;//todo зачем???
+    // The user's current network preference setting.
+    public static String sPref = null;
+    // The BroadcastReceiver that tracks network connectivity changes.
+    private NetworkReceiver receiver = new NetworkReceiver();
+    public static final String WIFI = "Wi-Fi";
+    public static final String ANY = "Any";
+
+
     void updateUI(String email) {
         ((TextView) findViewById(R.id.account)).setText(email);
     }
@@ -141,7 +166,99 @@ public class MainActivity extends AppCompatActivity {
         deleteSwitch = findViewById(R.id.delete_after_upload);
         requestSignIn();
         restoreErrorPathSetFromFile();
+
+        checkConnection();//todo эксперимент
+        Log.e(TAG, "is online - "+isOnline());//todo эксперимент
+
+        // Registers BroadcastReceiver to track network connection changes.
+        IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+        receiver = new NetworkReceiver();
+        this.registerReceiver(receiver, filter);
+
     }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // Unregisters BroadcastReceiver when app is destroyed.
+        if (receiver != null) {
+            this.unregisterReceiver(receiver);
+        }
+    }
+
+    // Refreshes the display if the network connection and the
+    // pref settings allow it.
+
+    @Override
+    public void onStart () {
+        super.onStart();
+
+        // Gets the user's network preference settings
+        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+
+        // Retrieves a string value for the preferences. The second parameter
+        // is the default value to use if a preference value is not found.
+        sPref = sharedPrefs.getString("listPref", "Wi-Fi");
+
+        updateConnectedFlags();
+    }
+
+    //todo это оставил только чтобы сохранить условие в IF, остальное не нужно. Нужно будет при
+    // проверке: разрешена ли загрузка только по WiFi или по любой
+    public void loadPage() {
+        if (((sPref.equals(ANY)) && (wifiConnected || mobileConnected))
+                || ((sPref.equals(WIFI)) && (wifiConnected))) {
+            // AsyncTask subclass
+            /////new DownloadXmlTask().execute(URL);
+        } else {
+            /////showErrorPage();
+        }
+    }
+
+
+    // Checks the network connection and sets the wifiConnected and mobileConnected
+    // variables accordingly.
+    public void updateConnectedFlags() {
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        NetworkInfo activeInfo = connMgr.getActiveNetworkInfo();
+        if (activeInfo != null && activeInfo.isConnected()) {
+            wifiConnected = activeInfo.getType() == ConnectivityManager.TYPE_WIFI;
+            mobileConnected = activeInfo.getType() == ConnectivityManager.TYPE_MOBILE;
+        } else {
+            wifiConnected = false;
+            mobileConnected = false;
+        }
+    }
+
+
+    void checkConnection() {
+        ConnectivityManager connMgr =
+                (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        boolean isWifiConn = false;
+        boolean isMobileConn = false;
+        for (Network network : connMgr.getAllNetworks()) {
+            NetworkInfo networkInfo = connMgr.getNetworkInfo(network);
+            if (networkInfo.getType() == ConnectivityManager.TYPE_WIFI) {
+                isWifiConn |= networkInfo.isConnected();
+            }
+            if (networkInfo.getType() == ConnectivityManager.TYPE_MOBILE) {
+                isMobileConn |= networkInfo.isConnected();
+            }
+        }
+
+        Log.e(TAG, "Wifi connected: " + isWifiConn);
+        Log.e(TAG, "Mobile connected: " + isMobileConn);
+    }
+
+    public boolean isOnline() {
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        return (networkInfo != null && networkInfo.isConnected());
+    }
+
 
     private void getFiles() {
         String name = "com.atomtex.ascanner";
@@ -752,9 +869,9 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "....... Загружаем следующий .......");
             uploadFileByFilePath(uploadQueue.get(0));
         }
-        /*if (uploadQueue.size() == 0 && errorPathSet.size() != 0) {
+        if (uploadQueue.size() == 0) {
             saveErrorPathSetToFile();
-        }*/
+        }
 
     }
 
@@ -772,8 +889,8 @@ public class MainActivity extends AppCompatActivity {
         // Сохранение только НЕПУСТОГО списка выглядит логично, но тогда, если в предыдущей сесии
         // были незагруженные файлы, которые были успешно аплодены при старте текущей сесии,
         // при перезагрузке будут загружены опять, так как список в Preferences так и остался
-        // не обнуленным. Поэтому если список ошибок пустой, то он все равно будет
-        // сохраняться в Preferences, тем самым перезаписывая и обнуляя прошлый список
+        // не обнуленным. Поэтому если список ошибок пустой, то он все равно будет сохраняться
+        // в Preferences, тем самым перезаписывая и обнуляя прошлый список
         Log.e(TAG, "....... Сохранение path незагруженных файлов в preference. Size = "+errorPathSet.size());
         saveStringSet(errorPathSet, ERROR_SET_PREF);
     }
@@ -855,5 +972,51 @@ public class MainActivity extends AppCompatActivity {
         }
         return set;
     }
+
+
+
+    public class NetworkReceiver extends BroadcastReceiver {
+
+        private boolean uploadIsAllowed;
+
+        public boolean isUploadAllowed() {
+            return uploadIsAllowed;
+        }
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            ConnectivityManager conn =  (ConnectivityManager)
+                    context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo networkInfo = conn.getActiveNetworkInfo();
+
+            // Checks the user prefs and the network connection. Based on the result, decides whether
+            // to refresh the display or keep the current display.
+            // If the userpref is Wi-Fi only, checks to see if the device has a Wi-Fi connection.
+            if (WIFI.equals(sPref) && networkInfo != null
+                    && networkInfo.getType() == ConnectivityManager.TYPE_WIFI) {
+                // If device has its Wi-Fi connection, sets refreshDisplay
+                // to true. This causes the display to be refreshed when the user
+                // returns to the app.
+
+                uploadIsAllowed = true;
+                Log.e(TAG, "wifi_connected");
+
+                // If the setting is ANY network and there is a network connection
+                // (which by process of elimination would be mobile), sets refreshDisplay to true.
+            } else if (ANY.equals(sPref) && networkInfo != null) {
+                uploadIsAllowed = true;
+                Log.e(TAG, "Any connected");
+
+                // Otherwise, the app can't download content--either because there is no network
+                // connection (mobile or Wi-Fi), or because the pref setting is WIFI, and there
+                // is no Wi-Fi connection.
+                // Sets refreshDisplay to false.
+            } else {
+                uploadIsAllowed = true;
+                Log.e(TAG, "lost_connection");
+            }
+        }
+    }
+
 
 }

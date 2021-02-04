@@ -21,7 +21,7 @@
         android:text="Не выбран аккаунт" />
 
     <Button
-        android:id="@+id/check_error_download"
+        android:id="@+id/upload_from_error_list"
         android:layout_width="match_parent"
         android:background="#009900"
         android:layout_height="32dp"
@@ -37,18 +37,14 @@
             android:id="@+id/start_queue"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:background="#009900"
-            android:layout_height="32dp"
-            android:layout_margin="6dp"
+            android:layout_height="wrap_content"
             android:text="Start Queue" />
 
         <Button
             android:id="@+id/reset_queue"
             android:layout_width="0dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="#009900"
-            android:layout_height="32dp"
-            android:layout_margin="6dp"
             android:text="Reset Queue" />
     </LinearLayout>
 
@@ -159,7 +155,7 @@
             android:gravity="center"/>
 
         <Switch
-            android:id="@+id/delete_after_download"
+            android:id="@+id/delete_after_upload"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_weight="1"

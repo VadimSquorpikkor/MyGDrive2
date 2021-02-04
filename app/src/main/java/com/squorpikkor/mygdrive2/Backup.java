@@ -158,7 +158,7 @@ class Backup extends AppCompatActivity {
         findViewById(R.id.load_folder_by_path).setOnClickListener(view -> uploadFileByFilePath(new java.io.File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/Folder/File.txt")));
 //        findViewById(R.id.create_folder_2).setOnClickListener(view -> mDriveServiceHelper.createFolderInDrive());
         findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
-        findViewById(R.id.check_error_download).setOnClickListener(view -> checkPathSetSize());
+        findViewById(R.id.upload_from_error_list).setOnClickListener(view -> checkPathSetSize());
         findViewById(R.id.start_queue).setOnClickListener(view -> downloadNextFile());
         findViewById(R.id.reset_queue).setOnClickListener(view -> downloadQueue = new ArrayList<>());//сброс (обнуление) очереди
 //        findViewById(R.id.get_folder_id).setOnClickListener(view -> getGoogleFolderIdNew(new java.io.File(sMainDir.toString() + "/crashReports/Folder/nuclib.txt")));

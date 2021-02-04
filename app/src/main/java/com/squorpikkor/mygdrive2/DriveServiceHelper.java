@@ -107,7 +107,15 @@ public class DriveServiceHelper {
             Log.e(TAG, "|    uploadFile: " + localFile.getName());
             Log.e(TAG, "----------------------------------------");
 
-            File fileMeta = mDriveService.files().create(metadata, fileContent).execute();
+            //todo java.net.SocketTimeoutException: timeout
+            File fileMeta = null;
+            try {
+                fileMeta = mDriveService.files().create(metadata, fileContent).execute();
+            } catch (IOException e) {
+                e.printStackTrace();
+                Log.e(TAG, "....... uploadFile: Что-то пошло не так...");
+
+            }
 
             if (fileMeta == null) {
                 throw new IOException("Null result when requesting file creation.");

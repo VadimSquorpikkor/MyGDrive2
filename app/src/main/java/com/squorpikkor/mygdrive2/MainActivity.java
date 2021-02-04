@@ -6,12 +6,14 @@ import androidx.core.content.ContextCompat;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.FileObserver;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.widget.EditText;
 import android.widget.Switch;
@@ -28,14 +30,12 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Queue;
 
 import static android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION;
 
@@ -57,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String MIME_TEXT_FILE = "text/plain";
     public static final String MIME_IMAGE_JPEG = "image/jpeg";
     public static final String MIME_FOLDER = "application/vnd.google-apps.folder";
+    private static final String ERROR_SET_PREF = "error_set_pref";
 
     private DriveServiceHelper mDriveServiceHelper;
     private String mOpenFileId;
@@ -130,27 +131,16 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.query_btn).setOnClickListener(view -> query());
         findViewById(R.id.upload_btn).setOnClickListener(view -> uploadFolder(sMainDir.toString()));
         findViewById(R.id.account).setOnClickListener(view -> selectAccount());
-        findViewById(R.id.load_folder_by_path).setOnClickListener(view -> startDownLoad(new java.io.File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/Folder/File.txt")));
+        findViewById(R.id.load_folder_by_path).setOnClickListener(view -> startUpload(new java.io.File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/Folder/File.txt")));
         findViewById(R.id.create_folder_2).setOnClickListener(view -> getFiles());
-        findViewById(R.id.check_error_download).setOnClickListener(view -> checkPathSetSize());
+        findViewById(R.id.upload_from_error_list).setOnClickListener(view -> uploadFromErrorList());
         findViewById(R.id.start_queue).setOnClickListener(view -> startQueue());
-        findViewById(R.id.reset_queue).setOnClickListener(view -> downloadQueue = new ArrayList<>());//сброс (обнуление) очереди
+        findViewById(R.id.reset_queue).setOnClickListener(view -> uploadQueue = new ArrayList<>());//сброс (обнуление) очереди
 
         cashSwitch = findViewById(R.id.do_cash);
-        deleteSwitch = findViewById(R.id.delete_after_download);
+        deleteSwitch = findViewById(R.id.delete_after_upload);
         requestSignIn();
-    }
-
-    void checkPathSetSize() {
-        Log.e(TAG, "****************  "+errorPathSet.size()+"  *****************");
-        for (String s:errorPathSet) {
-            Log.e(TAG, "checkPathSetSize: " + s);
-        }
-          if (errorPathSet.size() > 0) {
-              for (String s:errorPathSet) {
-                  uploadFileByFilePath(new java.io.File(s));
-              }
-          }
+        restoreErrorPathSetFromFile();
     }
 
     private void getFiles() {
@@ -242,26 +232,26 @@ public class MainActivity extends AppCompatActivity {
                                 Log.e(TAG, "createFile ID = : " + fileId);
                                 Log.e(TAG, "uploadFile: файл "+localFile.getAbsolutePath()+" успешно загружен, удалить адрес из pathSet");
                                 Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
-                                errorPathSet.remove(localFile.getAbsolutePath());
+                                //////errorPathSet.remove(localFile.getAbsolutePath());
                                 Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
                                 if (deleteSwitch.isChecked()) deleteFile(localFile);
-                                downloadNextFile();
+                                uploadNextFile();
                             })
                             .addOnFailureListener(exception -> {
                                 Log.e(TAG, "Couldn't create file.", exception);
-                                errorPathSet.add(localFile.getAbsolutePath());
+                                iCantUpload(localFile.getAbsolutePath()); ///errorPathSet.add(localFile.getAbsolutePath());
                             });
 
                 } else {
                     Log.e(TAG, ".....FILE ALREADY EXISTS!!!");
-                    errorPathSet.remove(localFile.getAbsolutePath());
+                    ////////errorPathSet.remove(localFile.getAbsolutePath());
                     if (deleteSwitch.isChecked()) deleteFile(localFile);
-                    downloadNextFile();
+                    uploadNextFile();
                 }
 
             })
                     .addOnFailureListener(exception ->
-                            errorPathSet.add(localFile.getAbsolutePath()));
+                            iCantUpload(localFile.getAbsolutePath())); ///errorPathSet.add(localFile.getAbsolutePath()));
         }
     }
 
@@ -311,6 +301,10 @@ public class MainActivity extends AppCompatActivity {
                     // The DriveServiceHelper encapsulates all REST API and SAF functionality.
                     // Its instantiation is required before handling any onClick actions.
                     mDriveServiceHelper = new DriveServiceHelper(googleDriveService);
+
+                    uploadFromErrorList();//АПЛОДИТЬ МОЖНО ТОЛЬКО ПОСЛЕ ТОГО, КАК ПРОИНИЦИАЛИЗИРОВАН mDriveServiceHelper
+
+
                 })
                 .addOnFailureListener(exception -> Log.e(TAG, "Unable to sign in.", exception));
     }
@@ -386,14 +380,14 @@ public class MainActivity extends AppCompatActivity {
                         Log.e(TAG, "createFile ID = : " + fileId);
                         Log.e(TAG, "uploadFile: файл "+localFile.getAbsolutePath()+" успешно загружен, удалить адрес из pathSet");
                         Log.e(TAG, "uploadFile: errorPathSet.size() BEFORE = "+errorPathSet.size());
-                        errorPathSet.remove(localFile.getAbsolutePath());
+                        ////errorPathSet.remove(localFile.getAbsolutePath());
                         Log.e(TAG, "uploadFile: errorPathSet.size() AFTER = "+errorPathSet.size());
                         if (deleteSwitch.isChecked()) deleteFile(localFile);
-                        downloadNextFile();
+                        uploadNextFile();
                     })
                     .addOnFailureListener(exception -> {
-                        Log.e(TAG, "Couldn't create file.", exception);
-                        errorPathSet.add(localFile.getAbsolutePath());
+                        Log.e(TAG, "Couldn't create file. "+localFile.getAbsolutePath(), exception);
+                        iCantUpload(localFile.getAbsolutePath()); ///errorPathSet.add(localFile.getAbsolutePath());
                     });
                 }
     }
@@ -508,32 +502,12 @@ public class MainActivity extends AppCompatActivity {
         java.io.File[] files = folder.listFiles();
         for (java.io.File file:files) {
             if (file.isFile()) {
-                startDownLoad(file);
+                startUpload(file);
             } else {
                 uploadFolder(file.getAbsolutePath());
             }
         }
 
-    }
-
-    private void createFolderAndStopNew(java.io.File folder, String cuttingPath, String folderId) {
-
-        //todo проверить, походу сохраняется путь без "/" в конце
-        /////updateCash(folder, cuttingPath, folderId);
-
-        Log.e(TAG, "createFolder: TRY");
-        if (mDriveServiceHelper != null) {
-            Log.e(TAG, "Creating a folder.");
-            mDriveServiceHelper.createFolder(folder.getName(), folderId)
-                .addOnSuccessListener(fileId -> {
-                    Log.e(TAG, "createFolder ID = : " + fileId);
-
-                })
-                .addOnFailureListener(exception -> {
-                    Log.e(TAG, "Couldn't create folder.", exception);
-                    errorPathSet.add(folder.getAbsolutePath());
-                });
-            }
     }
 
     /**Создание папки на облаке по имени и id родителя*/
@@ -566,6 +540,7 @@ public class MainActivity extends AppCompatActivity {
                     })
                     .addOnFailureListener(exception -> {
                         Log.e(TAG, "Couldn't create folder.", exception);
+                        iCantUpload(local_folder.getAbsolutePath());
                     });
         }
     }
@@ -644,7 +619,7 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "                       '");
     }
 
-    static ArrayList<java.io.File> downloadQueue = new ArrayList<>();
+    static ArrayList<java.io.File> uploadQueue = new ArrayList<>();
 
     void uploadFolderByFileList(java.io.File local_folder, String cuttingPath, String parent_Id) {
         Log.e(TAG, "------- cuttingPath = " + cuttingPath);
@@ -675,7 +650,7 @@ public class MainActivity extends AppCompatActivity {
                         doStuffNew(local_folder, cuttingPath, existingFile_id);
                     }
                 }).addOnFailureListener(exception -> {
-            errorPathSet.add(local_folder.getAbsolutePath());
+            iCantUpload(local_folder.getAbsolutePath()); ///errorPathSet.add(local_folder.getAbsolutePath());
         });
     }
 
@@ -689,7 +664,7 @@ public class MainActivity extends AppCompatActivity {
         if (cuttingPath.equals("")) {
             Log.e(TAG, ".....Конец цикла");
             if (deleteSwitch.isChecked()) deleteFile(local_folder);
-            downloadNextFile();
+            uploadNextFile();
         } else {
             Log.e(TAG, "OLD cuttingPath - " + cuttingPath);
             //Если pathArr.length >1, то cuttingPath: папка/файл -> файл, иначе: ""
@@ -704,6 +679,7 @@ public class MainActivity extends AppCompatActivity {
     /** Метод для удаления файлов после успешного аплода на облако.
      * Удаляет локальный файл. После удаления проверяет, если родительская папка пустая (т.е. это был последний файл в папке),
      * то удаляется родительская папка. Если родительская папка родительской папки пуста... Короче — и т.д.*/
+    //todo НЕЛЬЗЯ удалять файлы библиотеки, не будет работать программа, надо подумать (может просто сделать проверку в методе на имя)
     void deleteFile(java.io.File localFile) {
         java.io.File parent = localFile.getParentFile();
         Log.e(TAG, "try to delete file - "+localFile);
@@ -768,20 +744,44 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    void downloadNextFile() {
-        if (downloadQueue.size()>0){
-            downloadQueue.remove(0);
+    void uploadNextFile() {
+        if (uploadQueue.size()>0){
+            uploadQueue.remove(0);
         }
-        if (downloadQueue.size()>0){
+        Log.e(TAG, "....... files in Queue left "+ uploadQueue.size()+" .......");
+        if (uploadQueue.size()>0){
             Log.e(TAG, "....... Загружаем следующий .......");
-            uploadFileByFilePath(downloadQueue.get(0));
+            uploadFileByFilePath(uploadQueue.get(0));
+        }
+        /*if (uploadQueue.size() == 0 && errorPathSet.size() != 0) {
+            saveErrorPathSetToFile();
+        }*/
+
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        saveErrorPathSetToFile();
+    }
+
+    private void saveErrorPathSetToFile() {
+        if (errorPathSet.size() != 0) {
+            Log.e(TAG, "....... Сохранение path незагруженных файлов в preference. Size = "+errorPathSet.size());
+            saveStringSet(errorPathSet, ERROR_SET_PREF);
         }
     }
 
+    private void restoreErrorPathSetFromFile() {
+        Log.e(TAG, "....... Восстановление path незагруженных файлов из preference");
+        errorPathSet = loadStringSet(ERROR_SET_PREF);
+
+    }
+
     void startQueue() {
-        if (downloadQueue.size()>0){
+        if (uploadQueue.size()>0){
             Log.e(TAG, "....... Стартуем очередь .......");
-            uploadFileByFilePath(downloadQueue.get(0));
+            uploadFileByFilePath(uploadQueue.get(0));
         }
     }
 
@@ -789,18 +789,65 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "♦♦♦createFileObserver: START");
         return new RecursiveFileObserverNew(dirPath, (event, file) -> {
             Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
-            startDownLoad(file);
+            startUpload(file);
         });
     }
 
-    void startDownLoad(java.io.File file) {
-        Log.e(TAG, "***************************startDownLoad: "+ file.getAbsolutePath());
-        downloadQueue.add(file);
-        Log.e(TAG, "queue count = " + downloadQueue.size());
+    void startUpload(java.io.File file) {
+        Log.e(TAG, "***************************startUpLoad: "+ file.getAbsolutePath() + " ***************************");
+        uploadQueue.add(file);
+        Log.e(TAG, "queue count = " + uploadQueue.size());
 
-        if (downloadQueue.size() == 1) {
-            uploadFileByFilePath(downloadQueue.get(0));
+        if (uploadQueue.size() == 1) {
+            uploadFileByFilePath(uploadQueue.get(0));
         }
+    }
+
+    public void iCantUpload(String file_path) {
+        Log.e(TAG, "....... uploadError .......");
+        uploadNextFile();
+        Log.e(TAG, "....... Error List: ...................................");
+        errorPathSet.add(file_path);
+        int i = 0;
+        for (String path:errorPathSet) {
+            Log.e(TAG, ""+i+": "+path);
+            i++;
+        }
+        Log.e(TAG, ".......................................................");
+    }
+
+    //todo javax.net.ssl.SSLException при обрыве соединения во время аплода
+    private void uploadFromErrorList() {
+        for (String path:errorPathSet) {
+            startUpload(new java.io.File(path));
+        }
+        errorPathSet = new HashSet<>();//обнулить errorPathSet
+    }
+
+    public void saveStringSet(HashSet<String> set, String prefName) {
+        SharedPreferences mPreferences;
+        mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences.Editor editor = mPreferences.edit();
+        editor.clear();//For save less variables than before, if do not clear, it will load old variables, from old session
+        int i = 0;
+        for (String s:set) {
+            editor.putString(prefName + i, s);
+            i++;
+        }
+        editor.apply();
+    }
+
+    public HashSet<String> loadStringSet(String prefName) {
+        SharedPreferences mPreferences;
+        mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        HashSet<String> set = new HashSet<>();
+        int count = 0;
+        while (mPreferences.contains(prefName + count)) {
+            String s = mPreferences.getString(prefName + count, "");
+            set.add(s);
+            count++;
+        }
+        return set;
     }
 
 }

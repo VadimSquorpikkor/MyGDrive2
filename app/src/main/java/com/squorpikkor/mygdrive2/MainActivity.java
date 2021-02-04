@@ -270,7 +270,6 @@ public class MainActivity extends AppCompatActivity {
 
         Log.e(TAG, "requestSignIn: client = " + client);
 
-
         // The result of the sign-in Intent is handled in onActivityResult.
         startActivityForResult(client.getSignInIntent(), REQUEST_CODE_SIGN_IN);
     }
@@ -765,11 +764,18 @@ public class MainActivity extends AppCompatActivity {
         saveErrorPathSetToFile();
     }
 
+    /**Если файл по каким то причинам не загрузился на облако, то его локальный путь сохраняется в
+     * список незагруженных файлов. При закрытии/сворачивании приложения этот список сохраняется в
+     * Preferences. При старте приложения список восстанавливается из Preferences, после входа в
+     * аккаунт автоматом стартует аплод файлов из этого списка*/
     private void saveErrorPathSetToFile() {
-        if (errorPathSet.size() != 0) {
-            Log.e(TAG, "....... Сохранение path незагруженных файлов в preference. Size = "+errorPathSet.size());
-            saveStringSet(errorPathSet, ERROR_SET_PREF);
-        }
+        // Сохранение только НЕПУСТОГО списка выглядит логично, но тогда, если в предыдущей сесии
+        // были незагруженные файлы, которые были успешно аплодены при старте текущей сесии,
+        // при перезагрузке будут загружены опять, так как список в Preferences так и остался
+        // не обнуленным. Поэтому если список ошибок пустой, то он все равно будет
+        // сохраняться в Preferences, тем самым перезаписывая и обнуляя прошлый список
+        Log.e(TAG, "....... Сохранение path незагруженных файлов в preference. Size = "+errorPathSet.size());
+        saveStringSet(errorPathSet, ERROR_SET_PREF);
     }
 
     private void restoreErrorPathSetFromFile() {

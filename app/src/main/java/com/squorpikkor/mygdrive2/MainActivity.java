@@ -149,7 +149,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Set the onClick listeners for the button bar.
         findViewById(R.id.create_folder).setOnClickListener(view -> createFolder("NewFolder", null));
-        findViewById(R.id.open_btn).setOnClickListener(view -> openFilePicker());
+//        findViewById(R.id.open_btn).setOnClickListener(view -> openFilePicker());
+        findViewById(R.id.open_btn).setOnClickListener(view -> openFilePickerToUpload());
         findViewById(R.id.create_btn).setOnClickListener(view -> createFile());
         findViewById(R.id.save_btn).setOnClickListener(view -> saveFile());
         findViewById(R.id.query_btn).setOnClickListener(view -> query());
@@ -287,7 +288,9 @@ public class MainActivity extends AppCompatActivity {
                 if (resultCode == Activity.RESULT_OK && resultData != null) {
                     Uri uri = resultData.getData();
                     if (uri != null) {
-                        checkAndUploadFile(new java.io.File(Environment.getExternalStorageDirectory(), "nuclib.txt"), MIME_TEXT_FILE, null);
+//                        checkAndUploadFile(new java.io.File(Environment.getExternalStorageDirectory(), "nuclib.txt"), MIME_TEXT_FILE, null);
+                        Log.e(TAG, "uri.getPath() - " + uri.getPath());
+                        checkAndUploadFile(new java.io.File(uri.getPath()), MIME_TEXT_FILE, null);
 //                        uploadFile(new java.io.File(uri.getPath()));
                     }
                 }
@@ -389,7 +392,7 @@ public class MainActivity extends AppCompatActivity {
                     // Its instantiation is required before handling any onClick actions.
                     mDriveServiceHelper = new DriveServiceHelper(googleDriveService);
 
-                    uploadFromErrorList();//АПЛОДИТЬ МОЖНО ТОЛЬКО ПОСЛЕ ТОГО, КАК ПРОИНИЦИАЛИЗИРОВАН mDriveServiceHelper
+                    canIUpload();////uploadFromErrorList();//АПЛОДИТЬ МОЖНО ТОЛЬКО ПОСЛЕ ТОГО, КАК ПРОИНИЦИАЛИЗИРОВАН mDriveServiceHelper
 
 
                 })
@@ -541,49 +544,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    List<File> temporally;
-
-    List<File> getDriveFileListByParentID(String id) {
-//        List<File>[] temp = new List[1];
-        if (mDriveServiceHelper != null) {
-
-            //Перечень доступных свойств настраивается в mDriveService.files().list().setFields("files( ЗДЕСЬ )").execute()); (см. queryFiles())
-            mDriveServiceHelper.queryFiles()
-                    .addOnSuccessListener(fileList -> {
-                        Log.e(TAG, "...ON SUCCESS...");
-                        List<File> allFiles = fileList.getFiles();
-                        for (File file : allFiles) {
-                            Log.e(TAG, ".....all" + file.getName());
-                        }
-                        List<File> selectedFiles = new ArrayList<>();
-                        for (File file : allFiles) {
-                            if (!file.getTrashed() && file.getParents().get(0).equals(id)) {
-                                selectedFiles.add(file);
-                                Log.e(TAG, "..........file: " + file.getName());
-                            }
-                        }
-//                        temp[0] = selectedFiles;
-                        temporally = selectedFiles;
-                    })
-                    .addOnFailureListener(exception -> Log.e(TAG, "Unable to query files.", exception));
-        }
-//        return temp[0];
-        return temporally;
-    }
-
-
-    String searchIdByName(String name, List<File> list) {
-        for (File file : list) {
-            if (file.getName().equals(name)) return file.getId();
-        }
-        return "root";
-    }
-
-
-    //По пути папки получает список всех файлов в папке и каждый файл добавляет в очередь (автоматом стартует закачка)
-    //Если в папке попадается подпапка, то рекурсивно вызывается uploadFolder и перебирает все файлы уже в подпапке и т.д.
-    //По сути: метод на вход получает путь к локальной папке и загружает ВСЕ файлы, включая поддиректории
-    //При этом на GDrive полностью сохраняется структура директорий, как она была в локальной папке
+    /**По пути папки получает список всех файлов в папке и каждый файл добавляет в очередь
+     * (автоматом стартует закачка). Если в папке попадается подпапка, то рекурсивно вызывается
+     * uploadFolder и перебирает все файлы уже в подпапке и т.д. По сути: метод на вход получает
+     * путь к локальной папке и загружает ВСЕ файлы, включая поддиректории. При этом на GDrive
+     * полностью сохраняется структура директорий, как она была в локальной папке*/
     private void uploadFolder(String path) {
         java.io.File folder = new java.io.File(path);
         java.io.File[] files = folder.listFiles();
@@ -594,7 +559,6 @@ public class MainActivity extends AppCompatActivity {
                 uploadFolder(file.getAbsolutePath());
             }
         }
-
     }
 
     /**Создание папки на облаке по имени и id родителя*/
@@ -614,7 +578,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /** После создания папки метод переходит (через doStuffNew) к созданию подпапки.
-    Наличие такой папки, проверка на "файл или папка", проверка, есть ли уже такая папка/файл на облаке происходит в uploadFolderByFileList())*/
+     *  Наличие такой папки, проверка на "файл или папка", проверка, есть ли уже такая папка/файл
+     *  на облаке происходит в uploadFolderByFileList())*/
     private void createFolderAndContinue(java.io.File local_folder, java.io.File file, String cuttingPath, String parent_id) {
         if (mDriveServiceHelper != null) {
             mDriveServiceHelper.createFolder(file.getName(), parent_id)
@@ -653,14 +618,16 @@ public class MainActivity extends AppCompatActivity {
     HashSet<String> errorPathSet = new HashSet<>();
 
 
-    //Обертка для uploadFolderByFileList.
-    //Чтобы было проще с ним работать сделан этот класс только с одним параметром на входе
-    //В итоге получается метод, который на вход получает локальную папку, которая загружается на GDrive в
-    //СООТВЕТСТВУЮЩУЮ папку, как она находится относительно главной папки (с которой идет синхронизация)
-    //Т.е.: папка storage/emulated/0/com.atomtex.ascanner/folder_1/folder_2/folder_3/ будет загружена в MyDrive>com.atomtex.ascanner>folder_1>folder_2
-    //Если папка уже есть, то она загружаться не будет, но находящиеся в ней фалы будут загружены (если их не было)
-    //Если кроме создаваемой папки нет на облаке и её родителя, он будет создан
-    //Проблема, которую решает этод метод, в том, что на gDrive нет пути, есть только Id родителя, т.е. нельзя просто указать путь, по которому сохранять папку
+    /**Обертка для uploadFolderByFileList.
+     * Чтобы было проще с ним работать сделан этот класс только с одним параметром на входе.
+     * В итоге получается метод, который на вход получает локальную папку, которая загружается
+     * на GDrive в СООТВЕТСТВУЮЩУЮ папку, как она находится относительно главной папки (с которой
+     * идет синхронизация). Т.е.: папка storage/emulated/0/com.atomtex.ascanner/folder_1/folder_2/folder_3/
+     * будет загружена в MyDrive>com.atomtex.ascanner>folder_1>folder_2. Если папка уже есть, то
+     * она загружаться не будет, но находящиеся в ней фалы будут загружены (если их не было).
+     * Если кроме создаваемой папки нет на облаке и её родителя, он будет создан. Проблема, которую
+     * решает этод метод, в том, что на gDrive нет пути, есть только Id родителя,
+     * т.е. нельзя просто указать путь, по которому сохранять папку*/
     void uploadFileByFilePath(java.io.File local_folder) {
         String cuttingPath;
         if (local_folder.getAbsolutePath().contains(sMainDir.getAbsolutePath())) cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath()+"/", "");
@@ -684,8 +651,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void updateCash(String pathToCash, String file_Id) {
-        //todo для кэша: может быть такое: путь вместе с его id закеширован, но самого файла (папки) уже нет (пользователь удалил)
-        // вставка по id родителя в этом случае не сработает
+        //todo !!!для кэша: может быть такое: путь вместе с его id закеширован, но самого файла (папки) уже нет (пользователь удалил)
+        // вставка по id родителя в этом случае не сработает. Пока не будет решено, кэширование не вкючать
+        // Можно сделать, добавив проверку на наличие родителя по его id. Получится лишняя одна проверка ifExist, но с другой стороны
+        // если это не первого уровня родитель, то всё равно будет только одна проверка, а не проверка каждой папки
+        // поэтому смысл в кэше будет, даже с лишней проверкой
+        // !!!
 
         //todo кэш для файла не нужен!!!
 
@@ -706,8 +677,22 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "                       '");
     }
 
+    /**Очередь за загружаемых файлов*/
     static ArrayList<java.io.File> uploadQueue = new ArrayList<>();
 
+    /**метод рекурсивно перебирает названия папок на gDrive от синхронизируемой папки до самого
+     * последнего чайлда, каждый раз запоминая ID текущей папки. И если чайлд оказался последним,
+     * то в папке с ID родителя создает файл (если его там ещё не было). Итого: метод загружает
+     * файл/папку в папку по ID этой целевой папки, зная только путь локальной папки на телефоне
+     *
+     * На вход в самый первый раз (до рекурсии) метод получает в переменную cuttingPath всегда
+     * полный путь МИНУС все что идет до синхронизируемой папки: если на телефоне файл лежит по
+     * адресу: /storage/emulated/0/Android/data/com.atomtex.com/folder/file.txt, то cuttingPath
+     * будет выглядеть: com.atomtex.com/folder/file.txt. При каждом рекурсивном вызове
+     * uploadFolderByFileLis проверяется путь, если путь уже не содержит поддиректории (cuttingPath.equals("")),
+     * то метод аплодит файл/папку по полученному ранее ID, иначе cuttingPath будет уменьшаться на
+     * одну директорию СЛЕВА (в методе doStuffNew) и вместе с полученным ID будет рекурсивно вызван
+     * метод uploadFolderByFileList уже с новыми значениями ID и короткого пути*/
     void uploadFolderByFileList(java.io.File local_folder, String cuttingPath, String parent_Id) {
         Log.e(TAG, "------- cuttingPath = " + cuttingPath);
         Log.e(TAG, "------- filePath = " + local_folder.getAbsolutePath());
@@ -741,6 +726,9 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /**Если uploadFolderByFileList уже загрузил последнюю папку/файл содержащуюся в пути файла (т.е.
+     * в пути "папка1/папка2/файл1" уже загружены "папки1" "папки2" "файл1"
+     * */
     //убрал из doStuffNew загрузки файлов и папок — иначе пришлось бы проверять при создании на существование на облаке (ifExits).
     //теперь всё проверяется в uploadFolderByFileList
     void doStuffNew(java.io.File local_folder, String cuttingPath, String new_id) {
@@ -773,27 +761,6 @@ public class MainActivity extends AppCompatActivity {
         if (localFile.delete()) Log.e(TAG, "Удалено успешно");
         else Log.e(TAG, "Удалить не получилось");
         if (parent!=null && parent.listFiles()!=null && parent.listFiles().length==0)deleteFile(parent);
-    }
-
-    //Если файл/папку не удалось загрузить, то вызывается этот метод
-    //Метод создает новый поток для каждого незагруженного файла, ждет 10 сек и пытается загрузить файл снова
-    // todo временная мера, надо сделать, чтобы путь для незагруженного файла сохранялся в файл и попытки загрузки шли по сохраненному в файл пути
-    //  так, файл будет дозагружен даже после перезапускав программы
-    void tryToUploadLater(java.io.File local_folder, String cuttingPath, String file_Id) {
-        Thread thread = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    sleep(10000);
-                    Log.e(TAG, "--- try after 10 sec ---------" + local_folder.getName() + "------------");
-                    /////uploadFolderByFileList(local_folder, cuttingPath, file_Id);
-                    uploadFileByFilePath(local_folder);//Возможно будет так лучше
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        };
-        thread.start();
     }
 
     private String returnEvent(int event) {
@@ -843,7 +810,6 @@ public class MainActivity extends AppCompatActivity {
         if (uploadQueue.size() == 0) {
             saveErrorPathSetToFile();
         }
-
     }
 
     @Override
@@ -855,13 +821,14 @@ public class MainActivity extends AppCompatActivity {
     /**Если файл по каким то причинам не загрузился на облако, то его локальный путь сохраняется в
      * список незагруженных файлов. При закрытии/сворачивании приложения этот список сохраняется в
      * Preferences. При старте приложения список восстанавливается из Preferences, после входа в
-     * аккаунт автоматом стартует аплод файлов из этого списка*/
+     * аккаунт автоматом стартует аплод файлов из этого списка
+     *
+     * Сохранение только НЕПУСТОГО списка выглядит логично, но тогда, если в предыдущей сесии
+     * были незагруженные файлы, которые были успешно аплодены при старте текущей сесии,
+     * при перезагрузке будут загружены опять, так как список в Preferences так и остался
+     * не обнуленным. Поэтому если список ошибок пустой, то он все равно будет сохраняться
+     * в Preferences, тем самым перезаписывая и обнуляя прошлый список*/
     private void saveErrorPathSetToFile() {
-        // Сохранение только НЕПУСТОГО списка выглядит логично, но тогда, если в предыдущей сесии
-        // были незагруженные файлы, которые были успешно аплодены при старте текущей сесии,
-        // при перезагрузке будут загружены опять, так как список в Preferences так и остался
-        // не обнуленным. Поэтому если список ошибок пустой, то он все равно будет сохраняться
-        // в Preferences, тем самым перезаписывая и обнуляя прошлый список
         Log.e(TAG, "....... Сохранение path незагруженных файлов в preference. Size = "+errorPathSet.size());
         saveStringSet(errorPathSet, ERROR_SET_PREF);
     }
@@ -927,7 +894,8 @@ public class MainActivity extends AppCompatActivity {
         errorPathSet = new HashSet<>();//обнулить errorPathSet
     }
 
-    public void saveStringSet(HashSet<String> set, String prefName) {
+    /**Сохранение HashSet в SharedPreferences*/
+    private void saveStringSet(HashSet<String> set, String prefName) {
         SharedPreferences mPreferences;
         mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         SharedPreferences.Editor editor = mPreferences.edit();
@@ -940,7 +908,8 @@ public class MainActivity extends AppCompatActivity {
         editor.apply();
     }
 
-    public HashSet<String> loadStringSet(String prefName) {
+    /**Восстановление HashSet из SharedPreferences*/
+    private HashSet<String> loadStringSet(String prefName) {
         SharedPreferences mPreferences;
         mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         HashSet<String> set = new HashSet<>();
@@ -953,15 +922,24 @@ public class MainActivity extends AppCompatActivity {
         return set;
     }
 
+    /** Управляет разрешением на аплод (uploadIsAllowed) в зависимости от статуса флагов GSM и WiFi
+     *  и переключателя "Только WiFi". Если есть подключение и разрешена загрузка
+     *  через любое подключение (и GSM, и WiFi) — загрузка разрешена;
+     *  если разрешена загрузка только через WiFi и есть подключение по WiFi — загрузка разрешена.
+     *  Иначе — загрузка запрещена.
+     *  При срабатывании метода сразу начинается аплод незагруженных ранее файлов
+     *  (если загрузка разрешена)*/
     void canIUpload() {
         uploadIsAllowed = ((!WiFiOnlySwitch.isChecked()) && (wifiConnected || mobileConnected))
                 || (((WiFiOnlySwitch.isChecked()) && (wifiConnected)));
-        if (mDriveServiceHelper!=null)uploadFromErrorList();
+        if (uploadIsAllowed && mDriveServiceHelper!=null)uploadFromErrorList();
     }
 
 
+    /** На основе полученного бродкаста управляет флагами GSM и WiFi: вкл/выкл и запускает canIUpload().
+     *  Т.е. отслеживает подключение к GSM и WiFi и при изменении статуса разрешает или запрещает
+     *  загрузку файлов; если загрузка разрешена, начинает загрузку незагруженных ранее файлов*/
     public class NetworkReceiver extends BroadcastReceiver {
-
         @Override
         public void onReceive(Context context, Intent intent) {
             ConnectivityManager conn =  (ConnectivityManager)
@@ -980,10 +958,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, "lost_connection");
             }
             canIUpload();
-
         }
-
-
     }
 
 

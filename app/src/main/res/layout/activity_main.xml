@@ -142,7 +142,8 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="vertical"
+        android:paddingHorizontal="70dp">
 
         <Switch
             android:id="@+id/do_cash"
@@ -152,7 +153,7 @@
             android:text="Кэшировать"
             android:checked="false"
             android:textSize="12sp"
-            android:gravity="center"/>
+            android:gravity="end|center_vertical"/>
 
         <Switch
             android:id="@+id/delete_after_upload"
@@ -160,16 +161,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:checked="true"
-            android:gravity="center"
+            android:gravity="end|center_vertical"
             android:text="Удалить после загрузки"
             android:textSize="12sp" />
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
 
         <Switch
             android:id="@+id/wifi_only"
@@ -179,7 +173,8 @@
             android:text="Только по WiFi"
             android:checked="false"
             android:textSize="12sp"
-            android:gravity="center"/>
+            android:gravity="end|center_vertical"/>
+
 
     </LinearLayout>
 

@@ -27,8 +27,8 @@ public class RecursiveFileObserverNew extends FileObserver {
     }
 
     public RecursiveFileObserverNew(String path, EventListener listener) {
-//        this(path, ALL_EVENTS, listener);
-        this(path, FileObserver.CREATE|FileObserver.MOVE_SELF, listener);
+        this(path, ALL_EVENTS, listener);
+//        this(path, FileObserver.CREATE|FileObserver.MOVE_SELF, listener);
     }
 
     public RecursiveFileObserverNew(String path, int mask, EventListener listener) {

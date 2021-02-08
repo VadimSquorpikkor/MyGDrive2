@@ -810,16 +810,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    enum doNotDeleteList {
+
+    }
+
     /** Метод для удаления файлов после успешного аплода на облако.
      * Удаляет локальный файл. После удаления проверяет, если родительская папка пустая (т.е. это был последний файл в папке),
      * то удаляется родительская папка. Если родительская папка родительской папки пуста... Короче — и т.д.*/
-    //todo НЕЛЬЗЯ удалять файлы библиотеки, не будет работать программа, надо подумать (может просто сделать проверку в методе на имя)
     void deleteFile(java.io.File localFile) {
-        java.io.File parent = localFile.getParentFile();
-        Log.e(TAG, "try to delete file - "+localFile);
-        if (localFile.delete()) Log.e(TAG, "Удалено успешно");
-        else Log.e(TAG, "Удалить не получилось");
-        if (parent!=null && parent.listFiles()!=null && parent.listFiles().length==0)deleteFile(parent);
+        if (localFile.getAbsolutePath().equals(sMainDir.getAbsolutePath() + "/nuclib.txt")||
+                localFile.getAbsolutePath().equals(sMainDir.getAbsolutePath() + "/nuclib_sr.txt")) {
+            Log.e(TAG, String.format("Файл %s удалять нельзя!", localFile.getName()));
+        } else {
+            java.io.File parent = localFile.getParentFile();
+            Log.e(TAG, "try to delete file - "+localFile);
+            if (localFile.delete()) Log.e(TAG, "Удалено успешно");
+            else Log.e(TAG, "Удалить не получилось");
+            if (parent!=null && parent.listFiles()!=null && parent.listFiles().length==0)deleteFile(parent);
+        }
     }
 
     private String returnEvent(int event) {
@@ -905,11 +913,20 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**При срабатывании события CREATE файл добавляется в очередь для загрузки и начинается его
+     * загрузка, если файлов несколько, все они добавляются в очередь, одновременно загружается
+     * только один файл, остальные ожидают. Зделано так (а не в несколько потоков) для того, что
+     * иначе возможна ситуация, когда одновременно несколько загружаемых файлов, находящихся в
+     * одной директории, проинициализируют несколько одновременных процессов, которые, проверив,
+     * что такая папка не присутствует на облаке, создадут несколько одинаковых директорий на
+     * облаке (на GDrive возможно одновременное нахождение папок с одинаковым именем)
+     *
+     * FileObserver рекурсивен, т.е. отслеживает файлы как в текущей папке, так и в подпапках*/
     private RecursiveFileObserverNew createFileObserver(final String dirPath) {
         Log.e(TAG, "♦♦♦createFileObserver: START");
         return new RecursiveFileObserverNew(dirPath, (event, file) -> {
             Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
-            startUpload(file);
+            if (event==FileObserver.CREATE) startUpload(file);
         });
     }
 

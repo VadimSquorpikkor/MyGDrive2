@@ -192,8 +192,27 @@ public class DriveServiceHelper {
         return Tasks.call(mExecutor, () -> mDriveService.files().list().setFields("files(id, name, parents, mimeType, trashed)").execute()); //я изменил, теперь можно получать инфу: id, имя, id родителя, mime тип, удален ли файл
     }
 
-    //TODO вообще не правильно работает, надо если id=null, то возвращать список, а если id!=null, то возвращать
+    //todo if(!uploadIsAllowed) НЕ ДОЛЖЕН быть здесь
     public Task<FileList> checkIfExist(String name, String parentId) {
+        ////если parentId == null, то выбираем файлы в корне (id = "root")
+        Log.e(TAG, "checkIfExist");
+        if (!uploadIsAllowed) {
+            Log.e(TAG, "----- Загрузка запрещена!!! -----");
+            return null;
+        } else {
+            String id;
+            if (parentId == null) id = "root";
+            else id = parentId;
+
+            return Tasks.call(mExecutor, () -> mDriveService.files().list()
+                    .setQ("trashed=false and name='"+name+"' and '"+id+"' in parents")
+                    .setFields("files(id, name, parents, mimeType, trashed)")
+                    .execute());
+        }
+    }
+
+
+    public Task<FileList> checkIfExist_OLD(String name, String parentId) {
         //если parentId == null, то выбираем файлы в корне (id = "root")
         Log.e(TAG, "checkIfExist");
         String q = "trashed=false and name='"+name+"' and '"+parentId+"' in parents";

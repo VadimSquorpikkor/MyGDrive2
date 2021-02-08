@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 
 import static android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION;
 
@@ -166,9 +165,7 @@ public class MainActivity extends AppCompatActivity {
         deleteSwitch = findViewById(R.id.delete_after_upload);
         WiFiOnlySwitch = findViewById(R.id.wifi_only);
 
-        WiFiOnlySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            canIUpload();
-        });
+        WiFiOnlySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> canIUpload());
 
         requestSignIn();
         restoreErrorPathSetFromFile();
@@ -183,14 +180,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        // Unregisters BroadcastReceiver when app is destroyed.
-        if (receiver != null) {
-            this.unregisterReceiver(receiver);
-        }
-    }
+
 
     //todo это оставил только чтобы сохранить условие в IF, остальное не нужно. Нужно будет при
     // проверке: разрешена ли загрузка только по WiFi или по любой
@@ -789,7 +779,8 @@ public class MainActivity extends AppCompatActivity {
     //убрал из doStuffNew загрузки файлов и папок — иначе пришлось бы проверять при создании на существование на облаке (ifExits).
     //теперь всё проверяется в uploadFolderByFileList
     void doStuffNew(java.io.File local_folder, String cuttingPath, String new_id) {
-        cuttingPath = cuttingPath.replaceFirst("/", "");///для использования только с getIdFromCashNew
+        ////cuttingPath = cuttingPath.replaceFirst("/", "");///для использования только с getIdFromCashNew
+        if (cuttingPath.startsWith("/")) cuttingPath = cuttingPath.replaceFirst("/", "");///для использования только с getIdFromCashNew
         Log.e(TAG, " ☺☺☺☺  doStuffNew: cuttingPath - "+cuttingPath);
         String[] pathArr = cuttingPath.split("/");
         for (int i = 0; i < pathArr.length; i++) {
@@ -808,10 +799,6 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, ".....След цикл");
             uploadFolderByFileList(local_folder, newCuttingPath, new_id);
         }
-    }
-
-    enum doNotDeleteList {
-
     }
 
     /** Метод для удаления файлов после успешного аплода на облако.
@@ -865,8 +852,31 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**При срабатывании события CREATE файл добавляется в очередь для загрузки и начинается его
+     * загрузка, если файлов несколько, все они добавляются в очередь, одновременно загружается
+     * только один файл, остальные ожидают. Зделано так (а не в несколько потоков) для того, что
+     * иначе возможна ситуация, когда одновременно несколько загружаемых файлов, находящихся в
+     * одной директории, проинициализируют несколько одновременных процессов, которые, проверив,
+     * что такая папка не присутствует на облаке, создадут несколько одинаковых директорий на
+     * облаке (на GDrive возможно одновременное нахождение папок с одинаковым именем)
+     *
+     * FileObserver рекурсивен, т.е. отслеживает файлы как в текущей папке, так и в подпапках*/
+    private RecursiveFileObserverNew createFileObserver(final String dirPath) {
+        Log.e(TAG, "♦♦♦createFileObserver: START");
+        return new RecursiveFileObserverNew(dirPath, (event, file) -> {
+            if (event==FileObserver.CREATE) Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
+            if (event==FileObserver.CREATE) startUpload(file);
+        });
+    }
+
     void uploadNextFile() {
         if (uploadQueue.size()>0){
+
+            //todo для проверки Догрузка
+//            Log.e(TAG, "errorList size before - "+errorPathSet.size());
+//            if (errorPathSet.contains(uploadQueue.get(0).getAbsolutePath())) errorPathSet.remove(uploadQueue.get(0).getAbsolutePath());
+//            Log.e(TAG, "errorList size after - "+errorPathSet.size());
+
             uploadQueue.remove(0);
         }
         Log.e(TAG, "....... files in Queue left "+ uploadQueue.size()+" .......");
@@ -877,12 +887,6 @@ public class MainActivity extends AppCompatActivity {
         if (uploadQueue.size() == 0) {
             saveErrorPathSetToFile();
         }
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        saveErrorPathSetToFile();
     }
 
     /**Если файл по каким то причинам не загрузился на облако, то его локальный путь сохраняется в
@@ -913,23 +917,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**При срабатывании события CREATE файл добавляется в очередь для загрузки и начинается его
-     * загрузка, если файлов несколько, все они добавляются в очередь, одновременно загружается
-     * только один файл, остальные ожидают. Зделано так (а не в несколько потоков) для того, что
-     * иначе возможна ситуация, когда одновременно несколько загружаемых файлов, находящихся в
-     * одной директории, проинициализируют несколько одновременных процессов, которые, проверив,
-     * что такая папка не присутствует на облаке, создадут несколько одинаковых директорий на
-     * облаке (на GDrive возможно одновременное нахождение папок с одинаковым именем)
-     *
-     * FileObserver рекурсивен, т.е. отслеживает файлы как в текущей папке, так и в подпапках*/
-    private RecursiveFileObserverNew createFileObserver(final String dirPath) {
-        Log.e(TAG, "♦♦♦createFileObserver: START");
-        return new RecursiveFileObserverNew(dirPath, (event, file) -> {
-            Log.e(TAG, "♦♦♦onEvent: " + returnEvent(event));
-            if (event==FileObserver.CREATE) startUpload(file);
-        });
-    }
-
     //todo Вообще не нужно два массива для путей файлов (очередь и список_незагруженных) можно
     // использовать только один (очередь), просто при неудачной попытке загрузки путь не удаляется
     // из очереди, а uploadNextFile() пытается загрузить след., пока не дойдет до конца массива
@@ -939,9 +926,16 @@ public class MainActivity extends AppCompatActivity {
     // перезапуске приложения эти файлы не будут загружены на облако
     // Тогда uploadQueue должна будет хранить String
 
+    /**Добавление файла в очередь и начало закачки. Все последующие добавленные файлы ждут, пока
+     * первый файл в очереди будет загружен (или не загружен и помещен в список незагруженных),
+     * после чего первый файл удаляется, второй становится первым и начинает загружаться... и т.д.*/
     void startUpload(java.io.File file) {
-        Log.e(TAG, "***************************startUpLoad: "+ file.getAbsolutePath() + " ***************************");
+        Log.e(TAG, "***************************Добавлен в очередь: "+ file.getAbsolutePath() + " ***************************");
         uploadQueue.add(file);
+
+        //todo для проверки Догрузка
+//        errorPathSet.add(file.getAbsolutePath());
+
         Log.e(TAG, "queue count = " + uploadQueue.size());
 
         if (uploadQueue.size() == 1) {
@@ -963,6 +957,8 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, ".......................................................");
     }
 
+    /**Загрузка файлов из списка незагруженных. Все файлы из списка помещаются в очередь загрузки,
+     * сам список очищается*/
     private void uploadFromErrorList() {
         for (String path:errorPathSet) {
             startUpload(new java.io.File(path));
@@ -998,6 +994,19 @@ public class MainActivity extends AppCompatActivity {
         return set;
     }
 
+    /**Срабатываеи при onStop и onDestroy: все файлы из очереди добавляет в список незагруженных.
+     * Теперь даже при закрытии программы во время аплода файлов, при следующем старте программы
+     * все недокаченные файлы успешно догружаются
+     * Был другой вариант: при добавлении файлов в очередь, путь этого файла параллельно добавлялся
+     * в список незагруженных, при успешной загрузке из списка удалялся. По сути, работает одинаково,
+     * но так проще, надо потестировать, пока второй оставил закоментированным, надо потестить
+     * */
+    void insertAllQueueInErrorList() {
+        for (java.io.File file:uploadQueue) {
+            errorPathSet.add(file.getAbsolutePath());
+        }
+    }
+
     /** Управляет разрешением на аплод (uploadIsAllowed) в зависимости от статуса флагов GSM и WiFi
      *  и переключателя "Только WiFi". Если есть подключение и разрешена загрузка
      *  через любое подключение (и GSM, и WiFi) — загрузка разрешена;
@@ -1010,7 +1019,6 @@ public class MainActivity extends AppCompatActivity {
                 || (((WiFiOnlySwitch.isChecked()) && (wifiConnected)));
         if (uploadIsAllowed && mDriveServiceHelper!=null)uploadFromErrorList();
     }
-
 
     /** На основе полученного бродкаста управляет флагами GSM и WiFi: вкл/выкл и запускает canIUpload().
      *  Т.е. отслеживает подключение к GSM и WiFi и при изменении статуса разрешает или запрещает
@@ -1037,5 +1045,22 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Log.e(TAG, "onStop: ");
+        insertAllQueueInErrorList();
+        saveErrorPathSetToFile();
+    }
 
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.e(TAG, "onDestroy: ");
+        // Unregisters BroadcastReceiver when app is destroyed.
+        if (receiver != null) this.unregisterReceiver(receiver);
+
+        insertAllQueueInErrorList();
+        saveErrorPathSetToFile();
+    }
 }

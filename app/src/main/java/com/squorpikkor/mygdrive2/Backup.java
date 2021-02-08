@@ -1480,4 +1480,74 @@ class Backup extends AppCompatActivity {
         });
     }
 
+    //не работает
+    void getIdFromCash_old(java.io.File file, String pathWithoutRootFolder) {
+        Log.e(TAG, "                      ********start Cash pathWithoutRootFolder: "+pathWithoutRootFolder+" ********");
+        String id = null;
+        /*if (cashSwitch.isChecked() && cashMap.containsKey(file.getParent())) {
+            id = cashMap.get(file.getParent());
+            Log.e(TAG, "....................................");
+            Log.e(TAG, "..   Есть ID по такому пути! -> "+id);
+            Log.e(TAG, "....................................");
+            cuttingPath = "";
+        }*/
+
+        Log.e(TAG, "----------- Новая проверка ------------");
+        //cuttingPath: spec_20201229_103841.spe
+        java.io.File folderToCheck;
+        java.io.File foundFolder = null;
+        folderToCheck = file.getParentFile();
+        String cuttingPath = file.getName();
+        // Ищу совпадение пути в кэше. Сравниваю путь родителя, потом путь родителя родителя... \
+        // и так пока не будет найден сохраненный ранее id этого пути (while(id==null))
+        // или пока не дойду до корневой папки (while(folderToCheck!= null))
+        while (folderToCheck != null && id == null) {
+            //|  FOLDER name - com.atomtex.ascanner, path - /storage/emulated/0/Android/data/com.atomtex.ascanner, id - 1Wp2POS4mq0GVskPxXXDMGo7PvfPxOTf5
+            Log.e(TAG, "folderToCheck: "+folderToCheck);
+            id = cashMap.get(folderToCheck.getAbsolutePath());
+            Log.e(TAG, "|  FOLDER name - " + folderToCheck.getName() + ", path - " + folderToCheck.getAbsolutePath() + ", id - "+id);
+            //////Log.e(TAG, "|  pathWithoutRootFolder - " + pathWithoutRootFolder.replace("/" + folderToCheck.getName(), ""));
+//                cuttingPath = folderToCheck.getName()+"/"+cuttingPath;
+//                Log.e(TAG, "cuttingPath: "+cuttingPath);
+
+            //todo только для проверки:
+                /*if (cashMap.containsKey(folderToCheck.getAbsolutePath())) {
+                    Log.e(TAG, "....................................");
+                    Log.e(TAG, "..   Есть ID " +id+" по пути -> "+folderToCheck.getAbsolutePath());
+                    Log.e(TAG, "....................................");
+                }*/
+
+
+            foundFolder = folderToCheck;
+            folderToCheck = folderToCheck.getParentFile();
+        }
+
+        String path = foundFolder.getAbsolutePath();
+        if (path.equals("/")) {
+            ///////////////uploadFolderByFileList(file, pathWithoutRootFolder, id);
+        } else {
+            Log.e(TAG, "******* before"+path);
+            path = file.getAbsolutePath().replace(path+"/","");
+            Log.e(TAG, "******* after"+path);
+            ///////////////doStuffNew(file, path, id);
+        }
+
+
+
+//            if (folderToCheck!=null) pathWithoutRootFolder = pathWithoutRootFolder.replace("/" + foundFolder.getName(), "");
+//            Log.e(TAG, "pathWithoutRootFolder: " + pathWithoutRootFolder);
+//            Log.e(TAG, "---------------------------------------");
+//        uploadFolderByFileList(file, pathWithoutRootFolder, id);
+        uploadFolderByFileList(file, pathWithoutRootFolder, null);
+
+        /*String newCuttingPath = "";
+        String[] pathArr = cuttingPath.split("/");
+        if (pathArr.length != 1) newCuttingPath = cuttingPath.replace(pathArr[0] + "/", "");
+        Log.e(TAG, "NEW cuttingPath - " + newCuttingPath);
+        Log.e(TAG, ".....След цикл");*/
+
+        /////////uploadFolderByFileList(file, pathWithoutRootFolder, id);
+//        doStuffNew(file, foundFolder.getName(), id);
+    }
+
 }

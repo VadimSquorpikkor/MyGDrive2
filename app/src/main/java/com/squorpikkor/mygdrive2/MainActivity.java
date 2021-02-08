@@ -586,7 +586,7 @@ public class MainActivity extends AppCompatActivity {
                     .addOnSuccessListener(fileId -> {
                         Log.e(TAG, "createFolder name - "+ file.getName() + ", parentID - " + parent_id + ", created_folder_id - " + fileId);
 
-                        updateCash(file.getAbsolutePath(), fileId);
+                        if (cashSwitch.isChecked())updateCash(file.getAbsolutePath(), fileId);
 
                         doStuffNew(local_folder, cuttingPath, fileId);
                     })
@@ -627,16 +627,24 @@ public class MainActivity extends AppCompatActivity {
      * она загружаться не будет, но находящиеся в ней фалы будут загружены (если их не было).
      * Если кроме создаваемой папки нет на облаке и её родителя, он будет создан. Проблема, которую
      * решает этод метод, в том, что на gDrive нет пути, есть только Id родителя,
-     * т.е. нельзя просто указать путь, по которому сохранять папку*/
-    void uploadFileByFilePath(java.io.File local_folder) {
-        String cuttingPath;
-        if (local_folder.getAbsolutePath().contains(sMainDir.getAbsolutePath())) cuttingPath = local_folder.getAbsolutePath().replace(sMainDir.getAbsolutePath()+"/", "");
-        else cuttingPath = local_folder.getAbsolutePath().replace(Environment.getExternalStorageDirectory()+"/", "");
-        getIdFromCash(local_folder, cuttingPath);
-//        uploadFolderByFileList(local_folder, cuttingPath, null); //Загрузка напрямую, без кэширования
+     * т.е. нельзя просто указать путь, по которому сохранять папку
+     *
+     * Условие IF добавлено, чтобы загружать файлы НЕ из папки com.atomtex.ascanner
+     *
+     * pathWithoutRootFolder - * .....путь оставшийся после удаления из пути файла Environment.getExternalFilePath
+     * (для файлов не из папки RSA) или mainDir (для RSA, mainDir = storage/emulated...ascanner/),
+     * т.е. получаем путь, по которому файл будет храниться на облаке (не будет же он храниться на GDrive>storage>emulated>0 и т.д.):
+     * storage/emulated/0/com.atomtex.scanner/folder/file --> folder/file */
+    void uploadFileByFilePath(java.io.File local_file) {
+        String pathWithoutRootFolder;
+        if (local_file.getAbsolutePath().contains(sMainDir.getAbsolutePath())) pathWithoutRootFolder = local_file.getAbsolutePath().replace(sMainDir.getAbsolutePath()+"/", "");
+        else pathWithoutRootFolder = local_file.getAbsolutePath().replace(Environment.getExternalStorageDirectory()+"/", "");
+//        getIdFromCash(local_file, pathWithoutRootFolder);
+        getIdFromCashNew(local_file);
     }
 
     HashMap<String, String> cashMap = new HashMap<>();
+
 
     void getIdFromCash(java.io.File file, String cuttingPath) {
         String id = null;
@@ -648,6 +656,47 @@ public class MainActivity extends AppCompatActivity {
             cuttingPath = "";
         }
         uploadFolderByFileList(file, cuttingPath, id);
+    }
+
+    /**Кэширует пути всех папок и файлов. По итогу: с кэшем 1:17, без кэша 1:27.
+     * И оно того стоило???!!! И это ещё я не добавил проверку isIdExistsOnCloud,
+     * а это ещё один запрос на облако для каждого файла
+     *
+     * Проверка пути в кэше идет от родительской папки до папки приложения:
+     * sMainDir/folde1/folder2/folder3/file.txt первым проверяется путь
+     * storage/emulated/0/com.atomtex.ascanner/folder1/folder2/folder3, если такой путь найден в кэше,
+     * получаем id этой папки, при этом cutting_path будет равен ""; если не найден, то к
+     * cutting_path слева добавляем имя папки (формируем маску, теперь cutting_path = "/file.txt"),
+     * и далее следующий цикл, то же самое, но уже для родительской папки
+     * (storage/emulated/0/com.atomtex.ascanner/folder1/folder2)*/
+    void getIdFromCashNew(java.io.File file) {
+        String cutting_path;
+        String id = null;
+        if (!cashSwitch.isChecked()){ cutting_path = file.getAbsolutePath().replace(sMainDir.getAbsolutePath(), "");}
+        else {
+            cutting_path = "";
+            java.io.File tempFile;
+            tempFile = file;
+            //todo если переделать под do...while, то код можно сильно сократить, if вообще можно тогда убрать
+            while (!tempFile.getAbsolutePath().equals(sMainDir.getAbsolutePath()) && id == null) { //путь перебирается не до корневой папки, а до папки com.atomtex.ascanner)
+                if (cashMap.containsKey(tempFile.getParent())) {
+                    Log.e(TAG, "....................................");
+                    Log.e(TAG, "..   Есть ID по такому пути! -> " + id);
+                    Log.e(TAG, "....................................");
+                    id = cashMap.get(tempFile.getParent());
+                } else {
+                    cutting_path = "/" + tempFile.getName() + cutting_path;
+                    tempFile = tempFile.getParentFile();
+                }
+            }
+        }
+
+        uploadFolderByFileList(file, cutting_path, id);
+    }
+
+    boolean isIdExistsOnCloud(String id) {
+        //todo дописать реализацию
+        return true;
     }
 
     void updateCash(String pathToCash, String file_Id) {
@@ -662,7 +711,7 @@ public class MainActivity extends AppCompatActivity {
 
         //todo в кэш надо будет записывать и id самого файла, тогда можно проверять наличие файла на диске по сохраненному кэшу
 
-        if (!pathToCash.equals("")&&!cashMap.containsKey(pathToCash))cashMap.put(pathToCash, file_Id);
+        if (/*!pathToCash.equals("")&&*/!cashMap.containsKey(pathToCash))cashMap.put(pathToCash, file_Id);
         Log.e(TAG, "                       '");
         Log.e(TAG, "------ КЭШ ------");
         Log.e(TAG, "|   fileId = "+file_Id+", pathToCash = "+ pathToCash);
@@ -692,7 +741,15 @@ public class MainActivity extends AppCompatActivity {
      * uploadFolderByFileLis проверяется путь, если путь уже не содержит поддиректории (cuttingPath.equals("")),
      * то метод аплодит файл/папку по полученному ранее ID, иначе cuttingPath будет уменьшаться на
      * одну директорию СЛЕВА (в методе doStuffNew) и вместе с полученным ID будет рекурсивно вызван
-     * метод uploadFolderByFileList уже с новыми значениями ID и короткого пути*/
+     * метод uploadFolderByFileList уже с новыми значениями ID и короткого пути
+     *
+     * cuttingPath - последняя часть пути локального файла, часть, которая будет отниматься от пути файла
+     * При загрузке файла /storage/emulated/0/Android/data/com.atomtex.ascanner/count/count_20201229_103834.txt
+     * первый cuttingPath = count/count_20201229_103834.txt, значит сразу будет загружаться папка
+     * /storage/emulated/0/Android/data/com.atomtex.ascanner/ . Затем из cuttingPath отнимается часть до "/" включительно
+     * получается путь для след папки: /storage/emulated/0/Android/data/com.atomtex.ascanner/count/ и т.д.
+     * Когда от cuttingPath останется "" (и сам файл — не папка), это будет сигналом, что все подпапки загружены
+     * и докачивается уже сам файл в родительскую папку по её id*/
     void uploadFolderByFileList(java.io.File local_folder, String cuttingPath, String parent_Id) {
         Log.e(TAG, "------- cuttingPath = " + cuttingPath);
         Log.e(TAG, "------- filePath = " + local_folder.getAbsolutePath());
@@ -732,6 +789,8 @@ public class MainActivity extends AppCompatActivity {
     //убрал из doStuffNew загрузки файлов и папок — иначе пришлось бы проверять при создании на существование на облаке (ifExits).
     //теперь всё проверяется в uploadFolderByFileList
     void doStuffNew(java.io.File local_folder, String cuttingPath, String new_id) {
+        cuttingPath = cuttingPath.replaceFirst("/", "");///для использования только с getIdFromCashNew
+        Log.e(TAG, " ☺☺☺☺  doStuffNew: cuttingPath - "+cuttingPath);
         String[] pathArr = cuttingPath.split("/");
         for (int i = 0; i < pathArr.length; i++) {
             Log.e(TAG, "" +i+ ": " + pathArr[i]);
